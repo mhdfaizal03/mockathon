@@ -1,0 +1,163 @@
+import 'package:flutter/material.dart';
+import 'package:mockathon/core/theme.dart';
+import 'package:mockathon/authentication/login_page.dart';
+
+class WelcomePage extends StatelessWidget {
+  const WelcomePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // Access current theme
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Branding
+              Hero(
+                tag: 'app_logo',
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient:
+                        AppTheme.lightGradient, // Beautiful Indigo gradient
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.primaryColor.withOpacity(0.4),
+                        blurRadius: 30,
+                        spreadRadius: 5,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.rocket_launch_rounded,
+                    size: 64,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 48),
+
+              Text(
+                "MOCKATHON",
+                style: theme.textTheme.displayLarge!.copyWith(
+                  letterSpacing: 4,
+                  fontSize: 42,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                "Professional Assessment Platform",
+                style: theme.textTheme.bodyLarge!.copyWith(
+                  color: theme.colorScheme.onSurface.withOpacity(0.6),
+                ),
+              ),
+
+              const SizedBox(height: 64),
+
+              // Role Selection Cards
+              Text(
+                "Select Your Role",
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              Wrap(
+                spacing: 24,
+                runSpacing: 24,
+                alignment: WrapAlignment.center,
+                children: [
+                  _buildRoleCard(
+                    context,
+                    title: "Admin",
+                    icon: Icons.admin_panel_settings_rounded,
+                    color: Colors.redAccent,
+                  ),
+                  _buildRoleCard(
+                    context,
+                    title: "Interviewer",
+                    icon: Icons.edit_note_rounded,
+                    color: AppTheme.primaryOrange,
+                  ),
+                  _buildRoleCard(
+                    context,
+                    title: "Interviewee",
+                    icon: Icons.school_rounded,
+                    color: AppTheme.primaryIndigo,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoleCard(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required Color color,
+  }) {
+    final theme = Theme.of(context);
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => LoginPage(userType: title)),
+        );
+      },
+      child: Container(
+        width: 140,
+        height: 160,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.grey.withOpacity(0.1)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(
+                0.05,
+              ), // Soft shadow for light theme
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 32),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
