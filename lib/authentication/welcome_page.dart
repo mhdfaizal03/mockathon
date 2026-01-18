@@ -54,7 +54,7 @@ class WelcomePage extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                "Professional Assessment Platform",
+                "Test What You Are Capable Of",
                 style: theme.textTheme.bodyLarge!.copyWith(
                   color: theme.colorScheme.onSurface.withOpacity(0.6),
                 ),
