@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mockathon/core/theme.dart';
 import 'package:mockathon/services/data_service.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:mockathon/models/user_models.dart';
 
 class MarkForm extends StatefulWidget {
@@ -35,8 +36,6 @@ class _MarkFormState extends State<MarkForm> {
   }
 
   Future<void> _loadMarks() async {
-    // Determine how to load. Since getMarks returns a Stream, we can subscribe or just use StreamBuilder in build.
-    // However, we want to pre-fill the controllers.
     final stream = _dataService.getMarks(widget.studentId);
     stream.listen((marks) {
       if (mounted && marks != null) {
@@ -66,9 +65,8 @@ class _MarkFormState extends State<MarkForm> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
-        double newScore = double.parse(_scoreController.text);
+        double newScore = double.tryParse(_scoreController.text) ?? 0.0;
 
-        // Construct new marks object preserving other fields
         MarkModel newMarks = MarkModel(
           aptitude: widget.markType == 'aptitude'
               ? newScore
@@ -95,7 +93,7 @@ class _MarkFormState extends State<MarkForm> {
             title: "Mark Updated",
             message: "Your ${widget.title} marks have been updated.",
             timestamp: DateTime.now(),
-            targetRole: widget.studentId, // Targeting specific user
+            targetRole: widget.studentId,
             type: 'info',
           ),
         );
@@ -129,131 +127,190 @@ class _MarkFormState extends State<MarkForm> {
       padding: const EdgeInsets.all(24),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
+          constraints: const BoxConstraints(
+            maxWidth: 600,
+          ), // Slightly narrower for focus
           child: Column(
             children: [
+              // Header Card
+              Container(
+                margin: const EdgeInsets.only(bottom: 24),
+                padding: const EdgeInsets.all(24),
+                decoration: AppTheme.bentoDecoration(
+                  color: Colors.white,
+                  radius: 32,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryIndigo.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _getIconForType(widget.markType),
+                        color: AppTheme.primaryIndigo,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.title,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Enter assessment details below",
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ).animate().fade(duration: 400.ms).slideY(begin: -0.1, end: 0),
+
+              // Form Container
               Container(
                 padding: const EdgeInsets.all(32),
                 decoration: AppTheme.bentoDecoration(
-                  color: AppTheme.bentoSurface,
-                  radius: 40,
+                  color: Colors.white,
+                  radius: 32,
                 ),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppTheme.bentoAccent.withOpacity(0.1),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              _getIconForType(widget.markType),
-                              color: AppTheme.bentoAccent,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Text(
-                            widget.title,
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-                      const Text(
-                        "Score",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
+                      _buildLabel("Score", Icons.star_rounded),
+                      const SizedBox(height: 12),
                       TextFormField(
                         controller: _scoreController,
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
                         style: const TextStyle(
-                          fontSize: 20,
+                          fontSize: 24,
                           fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
+
                         decoration: InputDecoration(
-                          hintText: "0 - 100",
-                          prefixIcon: const Icon(Icons.star_outline),
+                          hintText: "0",
+                          suffixText: "/ ${_getMaxScore().toInt()}",
+                          suffixStyle: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[500],
+                            fontWeight: FontWeight.normal,
+                          ),
                           filled: true,
                           fillColor: AppTheme.bentoBg,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(20),
                             borderSide: BorderSide.none,
                           ),
-                          contentPadding: const EdgeInsets.all(20),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide(
+                              color: AppTheme.primaryIndigo,
+                              width: 2,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 20,
+                            horizontal: 24,
+                          ),
                         ),
                         validator: (v) {
                           if (v == null || v.isEmpty) return "Required";
                           final n = double.tryParse(v);
-                          if (n == null || n < 0 || n > 100)
-                            return "Invalid score";
+                          final max = _getMaxScore();
+                          if (n == null || n < 0 || n > max) {
+                            return "Max allowed is $max";
+                          }
                           return null;
                         },
+                        onFieldSubmitted: (_) =>
+                            FocusScope.of(context).nextFocus(),
                       ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        "Feedback",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
+
+                      const SizedBox(height: 32),
+
+                      _buildLabel("Feedback", Icons.edit_note_rounded),
+                      const SizedBox(height: 12),
                       TextFormField(
                         controller: _feedbackController,
                         maxLines: 5,
+                        style: const TextStyle(fontSize: 16),
                         decoration: InputDecoration(
-                          hintText: "Write your observations here...",
-                          prefixIcon: Padding(
-                            padding: const EdgeInsets.only(bottom: 70),
-                            child: const Icon(Icons.edit_note),
-                          ),
+                          hintText: "Write detailed observations...",
                           filled: true,
                           fillColor: AppTheme.bentoBg,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(20),
                             borderSide: BorderSide.none,
                           ),
-                          contentPadding: const EdgeInsets.all(20),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide(
+                              color: AppTheme.primaryIndigo,
+                              width: 2,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.all(24),
                         ),
+                        onFieldSubmitted: (_) => _submit(),
                       ),
-                      const SizedBox(height: 32),
+
+                      const SizedBox(height: 40),
+
                       SizedBox(
                         width: double.infinity,
-                        height: 64,
+                        height: 56,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.bentoJacket,
+                            backgroundColor: AppTheme.primaryIndigo,
+                            foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(16),
                             ),
                             elevation: 0,
                           ),
                           onPressed: _isLoading ? null : _submit,
                           child: _isLoading
-                              ? const CircularProgressIndicator(
-                                  color: Colors.white,
+                              ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
                                 )
                               : const Text(
-                                  "UPDATE MARKS",
+                                  "SUBMIT EVALUATION",
                                   style: TextStyle(
-                                    color: Colors.white,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
-                                    letterSpacing: 1.2,
+                                    letterSpacing: 1.0,
                                   ),
                                 ),
                         ),
@@ -261,10 +318,9 @@ class _MarkFormState extends State<MarkForm> {
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(
-                height: 100,
-              ), // Space for bottom nav or just breathing room
+              ).animate().fade(duration: 600.ms).slideY(begin: 0.1, end: 0),
+
+              const SizedBox(height: 48),
             ],
           ),
         ),
@@ -272,16 +328,46 @@ class _MarkFormState extends State<MarkForm> {
     );
   }
 
+  Widget _buildLabel(String text, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: Colors.grey[700]), // Subtle icon
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: Colors.grey[800],
+          ),
+        ),
+      ],
+    );
+  }
+
+  double _getMaxScore() {
+    switch (widget.markType) {
+      case 'aptitude':
+        return 25.0;
+      case 'gd':
+        return 10.0;
+      case 'hr':
+        return 10.0;
+      default:
+        return 100.0;
+    }
+  }
+
   IconData _getIconForType(String type) {
     switch (type) {
       case 'aptitude':
-        return Icons.psychology;
+        return Icons.psychology_alt_rounded;
       case 'gd':
-        return Icons.groups;
+        return Icons.groups_3_rounded;
       case 'hr':
-        return Icons.person_search;
+        return Icons.person_search_rounded;
       default:
-        return Icons.assessment;
+        return Icons.assessment_rounded;
     }
   }
 }

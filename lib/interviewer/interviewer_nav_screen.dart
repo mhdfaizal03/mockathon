@@ -3,7 +3,7 @@ import 'package:mockathon/core/theme.dart';
 import 'package:mockathon/interviewer/home_page.dart';
 import 'package:mockathon/interviewee/notification_screen.dart';
 import 'package:mockathon/services/auth_service.dart';
-import 'package:mockathon/authentication/welcome_page.dart';
+import 'package:mockathon/authentication/login_page.dart';
 
 class InterviewerNavScreen extends StatefulWidget {
   const InterviewerNavScreen({super.key});
@@ -26,7 +26,7 @@ class _InterviewerNavScreenState extends State<InterviewerNavScreen> {
       backgroundColor: AppTheme.bentoBg,
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final bool isLarge = constraints.maxWidth > 900;
+          final bool isLarge = MediaQuery.of(context).size.width > 800;
 
           if (isLarge) {
             return Row(
@@ -44,6 +44,13 @@ class _InterviewerNavScreenState extends State<InterviewerNavScreen> {
               Align(
                 alignment: Alignment.bottomCenter,
                 child: _buildMobileNav(),
+              ),
+              Positioned(
+                top: 16,
+                left: 16,
+                child: SafeArea(
+                  child: Image.asset('assets/softlogo.png', height: 60),
+                ),
               ),
             ],
           );
@@ -79,6 +86,11 @@ class _InterviewerNavScreenState extends State<InterviewerNavScreen> {
           const Spacer(),
           _buildSidebarItem(-1, Icons.logout, "Logout"),
           const SizedBox(height: 24),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: Image.asset('assets/softlogo.png', height: 80),
+          ),
+          const SizedBox(height: 12),
         ],
       ),
     );
@@ -101,7 +113,7 @@ class _InterviewerNavScreenState extends State<InterviewerNavScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
             color: isSelected
-                ? Colors.white.withOpacity(0.15)
+                ? Colors.white.withValues(alpha: 0.15)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
           ),
@@ -125,7 +137,7 @@ class _InterviewerNavScreenState extends State<InterviewerNavScreen> {
 
   Widget _buildMobileNav() {
     return Container(
-      margin: const EdgeInsets.all(24),
+      margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       decoration: AppTheme.bentoDecoration(
         color: AppTheme.cardLight,
@@ -173,13 +185,14 @@ class _InterviewerNavScreenState extends State<InterviewerNavScreen> {
 
     if (confirm == true) {
       await auth.signOut();
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const WelcomePage()),
-          (route) => false,
-        );
-      }
+      if (!context.mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const LoginPage(userType: "Interviewer"),
+        ),
+        (route) => false,
+      );
     }
   }
 

@@ -9,15 +9,28 @@ import 'package:mockathon/services/auth_service.dart';
 import 'package:mockathon/models/user_models.dart';
 import 'package:mockathon/interviewee/nav_screen.dart';
 import 'package:mockathon/interviewer/interviewer_nav_screen.dart';
+import 'package:mockathon/interviewee/onboarding_screen.dart';
+import 'package:mockathon/services/notification_service.dart'; // Added import
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Added import for ProviderScope
+import 'package:flutter/foundation.dart'; // Added import for debugPrint
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(const MockathonApp());
+
+  // Initialize Notifications
+  try {
+    await NotificationService().init();
+  } catch (e) {
+    debugPrint("Notification Init Error: $e");
+  }
+
+  runApp(const ProviderScope(child: MyApp()));
 }
 
-class MockathonApp extends StatelessWidget {
-  const MockathonApp({super.key});
+class MyApp extends StatelessWidget {
+  // Renamed from MockathonApp
+  const MyApp({super.key}); // Renamed from MockathonApp
 
   @override
   Widget build(BuildContext context) {
@@ -45,8 +58,8 @@ class AuthWrapper extends StatelessWidget {
         }
 
         if (snapshot.hasData) {
-          return FutureBuilder<UserModel?>(
-            future: AuthService().getUserProfile(snapshot.data!.uid),
+          return StreamBuilder<UserModel?>(
+            stream: AuthService().getUserProfileStream(snapshot.data!.uid),
             builder: (context, roleSnap) {
               if (roleSnap.connectionState == ConnectionState.waiting) {
                 return const Scaffold(
@@ -55,10 +68,17 @@ class AuthWrapper extends StatelessWidget {
               }
 
               if (roleSnap.data != null) {
-                final role = roleSnap.data!.role;
-                if (role == UserRole.admin) return const Dashboard();
-                if (role == UserRole.interviewer)
+                final userProfile = roleSnap.data!;
+                if (userProfile.role == UserRole.admin) {
+                  return const Dashboard();
+                }
+                if (userProfile.role == UserRole.interviewer) {
                   return const InterviewerNavScreen();
+                }
+
+                if (!userProfile.hasCompletedOnboarding) {
+                  return const OnboardingScreen();
+                }
                 return const NavScreen();
               }
 

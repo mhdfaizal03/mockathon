@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:mockathon/core/theme.dart';
 import 'package:mockathon/services/auth_service.dart';
 import 'package:mockathon/services/data_service.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:mockathon/models/user_models.dart';
-import 'package:mockathon/authentication/welcome_page.dart';
-import 'package:mockathon/interviewee/profile_page.dart';
+import 'dart:convert';
+import 'dart:html' as html;
+
+import 'package:mockathon/admin/student_profile_page.dart';
+import 'package:mockathon/authentication/login_page.dart';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -18,6 +22,101 @@ class _DashboardState extends State<Dashboard> {
   final AuthService _authService = AuthService();
   int _selectedIndex = 0;
 
+  // Filtering
+  String _selectedStackFilter = 'All';
+  String _selectedRemainStatusFilter = 'All';
+
+  // Report Specific Filtering
+  String _reportStackFilter = 'All';
+  String _reportRemainStatusFilter = 'All';
+  bool _reportIncludeUnmarked = false;
+
+  final List<String> _stackOptions = [
+    'UI/UX',
+    'Flutter',
+    'Python',
+    'MERN',
+    'Digital Marketing',
+    'Data Analytics',
+    'Data Science',
+  ];
+
+  final List<String> _remainStatusOptions = ['Main Project', 'Mini Project'];
+
+  Future<void> _downloadCsv() async {
+    try {
+      final students = await _dataService.getStudents().first;
+      final marksMap = await _dataService.getAllMarksStream().first;
+
+      List<String> rows = [
+        "Name,Email,Stack,Remain Status,Aptitude,Aptitude Feedback,GD,GD Feedback,HR,HR Feedback",
+      ];
+
+      for (var student in students) {
+        // Apply Filters
+        if (_reportStackFilter != 'All' &&
+            student.stack.trim().toLowerCase() !=
+                _reportStackFilter.trim().toLowerCase()) {
+          // Case insensitive check
+          continue;
+        }
+        if (_reportRemainStatusFilter != 'All' &&
+            student.remainStatus != _reportRemainStatusFilter) {
+          continue;
+        }
+
+        final mark = marksMap[student.uid];
+
+        // Check inclusion criteria
+        bool hasMarks =
+            mark != null && (mark.aptitude > 0 || mark.gd > 0 || mark.hr > 0);
+
+        if (_reportIncludeUnmarked || hasMarks) {
+          final row = [
+            student.name,
+            student.email,
+            student.stack,
+            student.remainStatus,
+            mark?.aptitude ?? 'N/A',
+            (mark?.aptitudeFeedback ?? '').replaceAll(',', ' '),
+            mark?.gd ?? 'N/A',
+            (mark?.gdFeedback ?? '').replaceAll(',', ' '),
+            mark?.hr ?? 'N/A',
+            (mark?.hrFeedback ?? '').replaceAll(',', ' '),
+          ].join(',');
+          rows.add(row);
+        }
+      }
+
+      final String csv = rows.join('\n');
+      final bytes = utf8.encode(csv);
+      final blob = html.Blob([bytes]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+      final anchor = html.AnchorElement(href: url)
+        ..setAttribute("download", "candidates_marks.csv")
+        ..click();
+      html.Url.revokeObjectUrl(url);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("CSV Downloaded"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error downloading CSV: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -29,6 +128,7 @@ class _DashboardState extends State<Dashboard> {
       _buildUserManagement('interviewer', theme),
       _buildBroadcastScreen(theme),
       _buildPublishScreen(theme),
+      _buildReportsScreen(theme), // Index 5
     ];
 
     return Scaffold(
@@ -43,18 +143,23 @@ class _DashboardState extends State<Dashboard> {
             // Main Content Area
             Expanded(
               child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // 1. Header (Pill Style)
-                    _buildHeader(theme),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: Column(
+                      children: [
+                        // 1. Header (Pill Style)
+                        _buildHeader(theme),
 
-                    // 2. Content
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: pages[_selectedIndex],
+                        // 2. Content
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: pages[_selectedIndex],
+                        ),
+                        const SizedBox(height: 24),
+                      ],
                     ),
-                    const SizedBox(height: 24),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -68,9 +173,13 @@ class _DashboardState extends State<Dashboard> {
   }
 
   Widget _buildHeader(ThemeData theme) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      margin: EdgeInsets.all(isMobile ? 12 : 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 24,
+        vertical: isMobile ? 12 : 16,
+      ),
       decoration: AppTheme.bentoDecoration(
         color: AppTheme.cardLight,
         radius: 40,
@@ -89,31 +198,55 @@ class _DashboardState extends State<Dashboard> {
                     );
                   },
                 ),
-              const Text(
+              Text(
                 "Admin Dashboard",
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: isMobile ? 16 : 18,
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
                 ),
               ),
             ],
           ),
-          InkWell(
-            onTap: () => _confirmLogout(context),
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppTheme.cardLight,
-                border: Border.all(color: Colors.grey.withOpacity(0.3)),
+          Row(
+            children: [
+              if (MediaQuery.of(context).size.width > 600)
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.bentoJacket,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  onPressed: _downloadCsv,
+                  icon: const Icon(Icons.download, size: 18),
+                  label: const Text("Export CSV"),
+                ),
+              const SizedBox(width: 16),
+              InkWell(
+                onTap: () => _confirmLogout(context),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppTheme.cardLight,
+                    border: Border.all(
+                      color: Colors.grey.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.logout,
+                    size: 20,
+                    color: Colors.redAccent,
+                  ),
+                ),
               ),
-              child: const Icon(
-                Icons.logout,
-                size: 20,
-                color: Colors.redAccent,
-              ),
-            ),
+            ],
           ),
         ],
       ),
@@ -144,15 +277,20 @@ class _DashboardState extends State<Dashboard> {
           const SizedBox(height: 48),
           _navItem(0, Icons.dashboard, "Overview", theme),
           const SizedBox(height: 12),
-          _navItem(1, Icons.people, "Students", theme),
+          _navItem(1, Icons.people, "Candidates", theme),
           const SizedBox(height: 12),
           _navItem(2, Icons.work, "Interviewers", theme),
           const SizedBox(height: 12),
           _navItem(3, Icons.campaign, "Broadcast", theme),
           const SizedBox(height: 12),
           _navItem(4, Icons.publish, "Publish Result", theme),
-          const Spacer(),
           const SizedBox(height: 12),
+          _navItem(5, Icons.download_rounded, "Reports", theme),
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 24),
+            child: Image.asset('assets/softlogo.png', height: 100),
+          ),
         ],
       ),
     );
@@ -163,34 +301,22 @@ class _DashboardState extends State<Dashboard> {
       backgroundColor: AppTheme.bentoBg,
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
+        child: ListView(
           children: [
-            const SizedBox(height: 48),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: AppTheme.bentoDecoration(
-                color: AppTheme.bentoJacket,
-                radius: 24,
-              ),
-              child: const Text(
-                "MOCKATHON",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 48),
+            const SizedBox(height: 20),
+            Image.asset('assets/softlogo.png', height: 100),
+
             _navItem(0, Icons.dashboard, "Overview", theme),
             const SizedBox(height: 12),
-            _navItem(1, Icons.people, "Students", theme),
+            _navItem(1, Icons.people, "Candidates", theme),
             const SizedBox(height: 12),
             _navItem(2, Icons.work, "Interviewers", theme),
             const SizedBox(height: 12),
             _navItem(3, Icons.campaign, "Broadcast", theme),
             const SizedBox(height: 12),
             _navItem(4, Icons.publish, "Publish Result", theme),
+            const SizedBox(height: 12),
+            _navItem(5, Icons.download_rounded, "Reports", theme),
             const Spacer(),
             const SizedBox(height: 12),
           ],
@@ -219,12 +345,16 @@ class _DashboardState extends State<Dashboard> {
           children: [
             Icon(icon, color: isSelected ? Colors.white : Colors.grey),
             const SizedBox(width: 16),
-            Text(
-              title,
-              style: TextStyle(
-                color: isSelected ? Colors.white : Colors.grey[700],
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
+            Flexible(
+              child: Text(
+                title,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.grey[700],
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -237,42 +367,108 @@ class _DashboardState extends State<Dashboard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Filters
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterChip(
+                  "Stack",
+                  _selectedStackFilter,
+                  ['All', ..._stackOptions],
+                  (val) => setState(() => _selectedStackFilter = val),
+                ),
+                const SizedBox(width: 12),
+                _buildFilterChip(
+                  "Status",
+                  _selectedRemainStatusFilter,
+                  ['All', ..._remainStatusOptions],
+                  (val) => setState(() => _selectedRemainStatusFilter = val),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
         // Grid of Bento Stats
         StreamBuilder<List<StudentModel>>(
           stream: _dataService.getStudents(),
           builder: (context, snapshot) {
-            int total = 0;
-            if (snapshot.hasData) total = snapshot.data!.length;
+            final allStudents = snapshot.data ?? [];
+            final filtered = allStudents.where((s) {
+              if (_selectedStackFilter != 'All' &&
+                  s.stack.trim().toLowerCase() !=
+                      _selectedStackFilter.trim().toLowerCase())
+                return false;
+              if (_selectedRemainStatusFilter != 'All' &&
+                  s.remainStatus != _selectedRemainStatusFilter)
+                return false;
+              return true;
+            }).toList();
+            int total = filtered.length;
 
-            return Row(
-              children: [
-                Expanded(
-                  child: _bentoStatCard(
-                    "Students",
-                    "$total",
-                    AppTheme.bentoJacket,
-                    Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _bentoStatCard(
-                    "Sessions",
-                    "Active",
-                    AppTheme.bentoSurface,
-                    Colors.black87,
-                  ),
-                ),
-              ],
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                // If constrained width is less than 500, stack them.
+                bool isNarrow = constraints.maxWidth < 500;
+
+                List<Widget> cards = [
+                  if (isNarrow) ...[
+                    SizedBox(
+                      width: double.infinity,
+                      child: _bentoStatCard(
+                        "Candidates",
+                        "$total",
+                        AppTheme.bentoJacket,
+                        Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: _bentoStatCard(
+                        "Sessions",
+                        "Active",
+                        AppTheme.bentoSurface,
+                        Colors.black87,
+                      ),
+                    ),
+                  ] else ...[
+                    Expanded(
+                      child: _bentoStatCard(
+                        "Candidates",
+                        "$total",
+                        AppTheme.bentoJacket,
+                        Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _bentoStatCard(
+                        "Sessions",
+                        "Active",
+                        AppTheme.bentoSurface,
+                        Colors.black87,
+                      ),
+                    ),
+                  ],
+                ];
+
+                if (isNarrow) {
+                  return Column(children: cards);
+                } else {
+                  return Row(children: cards);
+                }
+              },
             );
           },
         ),
         const SizedBox(height: 24),
 
-        const SizedBox(height: 24),
-
         Container(
-          constraints: const BoxConstraints(maxHeight: 400),
+          width: double.infinity,
           padding: const EdgeInsets.all(24),
           decoration: AppTheme.bentoDecoration(
             color: AppTheme.bentoSurface,
@@ -286,93 +482,144 @@ class _DashboardState extends State<Dashboard> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              Expanded(
-                child: StreamBuilder<List<StudentModel>>(
-                  stream: _dataService.getStudents(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting)
-                      return const Center(child: CircularProgressIndicator());
-                    if (!snapshot.hasData || snapshot.data!.isEmpty)
-                      return const Center(child: Text("No data found"));
+              StreamBuilder<Map<String, MarkModel>>(
+                stream: _dataService.getAllMarksStream(),
+                builder: (context, markSnap) {
+                  final marksMap = markSnap.data ?? {};
 
-                    final students = snapshot.data!;
-                    return ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: students.length,
-                      itemBuilder: (context, index) {
-                        final student = students[index];
-                        return StreamBuilder<MarkModel?>(
-                          stream: _dataService.getMarks(student.uid),
-                          builder: (context, markSnap) {
-                            final marks = markSnap.data;
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: InkWell(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          ProfilePage(student: student),
-                                    ),
-                                  );
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: AppTheme.bentoDecoration(
-                                    color: AppTheme.softWhite,
-                                    radius: 20,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      CircleAvatar(
-                                        backgroundColor: AppTheme.bentoBg,
-                                        child: Text(
-                                          student.name[0],
-                                          style: const TextStyle(
-                                            color: Colors.black,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                  return StreamBuilder<List<StudentModel>>(
+                    stream: _dataService.getStudents(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      final allStudents = snapshot.data ?? [];
+
+                      // Filter: Only show students who have marks AND match selected filters
+                      final markedStudents = allStudents.where((s) {
+                        // 1. Must have marks
+                        final m = marksMap[s.uid];
+                        bool hasMarks =
+                            m != null &&
+                            (m.aptitude > 0 || m.gd > 0 || m.hr > 0);
+                        if (!hasMarks) return false;
+
+                        // 2. Must match Stack Filter
+                        if (_selectedStackFilter != 'All' &&
+                            s.stack.trim().toLowerCase() !=
+                                _selectedStackFilter.trim().toLowerCase()) {
+                          return false;
+                        }
+
+                        // 3. Must match Status Filter
+                        if (_selectedRemainStatusFilter != 'All' &&
+                            s.remainStatus != _selectedRemainStatusFilter) {
+                          return false;
+                        }
+
+                        return true;
+                      }).toList();
+
+                      if (markedStudents.isEmpty) {
+                        return Text("No marked students yet.");
+                      }
+
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: markedStudents.length,
+                        itemBuilder: (context, index) {
+                          final student = markedStudents[index];
+                          final marks = marksMap[student.uid];
+
+                          return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: InkWell(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => StudentProfilePage(
+                                          student: student,
                                         ),
                                       ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: AppTheme.bentoDecoration(
+                                      color: AppTheme.softWhite,
+                                      radius: 20,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
                                           children: [
-                                            Text(
-                                              student.name,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
+                                            CircleAvatar(
+                                              backgroundColor: AppTheme.bentoBg,
+                                              child: Text(
+                                                student.name.isNotEmpty
+                                                    ? student.name[0]
+                                                    : '?',
+                                                style: const TextStyle(
+                                                  color: Colors.black,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
                                             ),
-                                            Text(
-                                              student.randomId,
-                                              style: const TextStyle(
-                                                color: Colors.grey,
-                                                fontSize: 12,
+                                            const SizedBox(width: 16),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    student.name,
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    student.randomId,
+                                                    style: const TextStyle(
+                                                      color: Colors.grey,
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
                                           ],
                                         ),
-                                      ),
-                                      _miniBadge("APT", marks?.aptitude ?? 0),
-                                      const SizedBox(width: 8),
-                                      _miniBadge("GD", marks?.gd ?? 0),
-                                      const SizedBox(width: 8),
-                                      _miniBadge("HR", marks?.hr ?? 0),
-                                    ],
+                                        SizedBox(height: 10),
+                                        Wrap(
+                                          children: [
+                                            _miniBadge(
+                                              "APT",
+                                              marks?.aptitude ?? 0,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            _miniBadge("GD", marks?.gd ?? 0),
+                                            const SizedBox(width: 4),
+                                            _miniBadge("HR", marks?.hr ?? 0),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    );
-                  },
-                ),
+                              )
+                              .animate()
+                              .fade(delay: (index * 100).ms)
+                              .slideX(begin: 0.1, end: 0);
+                        },
+                      );
+                    },
+                  );
+                },
               ),
             ],
           ),
@@ -383,8 +630,9 @@ class _DashboardState extends State<Dashboard> {
   }
 
   Widget _bentoStatCard(String label, String value, Color bg, Color text) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       decoration: AppTheme.bentoDecoration(color: bg, radius: 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,23 +640,23 @@ class _DashboardState extends State<Dashboard> {
           Text(
             value,
             style: TextStyle(
-              fontSize: 28,
+              fontSize: isMobile ? 22 : 28,
               fontWeight: FontWeight.bold,
               color: text,
             ),
           ),
-          Text(label, style: TextStyle(color: text.withOpacity(0.7))),
+          Text(label, style: TextStyle(color: text.withValues(alpha: 0.7))),
         ],
       ),
     );
   }
 
   Widget _miniBadge(String label, double score) {
-    final color = score > 0 ? AppTheme.bentoJacket : Colors.grey[300];
+    final color = score > 0 ? _getMarkColor(score) : Colors.grey[300];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color!.withOpacity(0.1),
+        color: color!.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
@@ -422,6 +670,14 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
+  Color _getMarkColor(double score) {
+    if (score >= 90) return Colors.green;
+    if (score >= 70) return Colors.lightGreen;
+    if (score >= 50) return Colors.orange;
+    if (score >= 40) return Colors.amber;
+    return Colors.redAccent;
+  }
+
   Widget _buildUserManagement(String role, ThemeData theme) {
     return Column(
       children: [
@@ -431,7 +687,9 @@ class _DashboardState extends State<Dashboard> {
             // Header in a bento tile? Or just text. Let's do a bento tile header.
             Expanded(
               child: Container(
-                padding: const EdgeInsets.all(24),
+                padding: EdgeInsets.all(
+                  MediaQuery.of(context).size.width < 600 ? 16 : 24,
+                ),
                 decoration: AppTheme.bentoDecoration(
                   color: AppTheme.bentoAccent,
                   radius: 32,
@@ -440,9 +698,11 @@ class _DashboardState extends State<Dashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      role == 'interviewee' ? "Students" : "Interviewers",
-                      style: const TextStyle(
-                        fontSize: 24,
+                      role == 'interviewee' ? "Candidates" : "Interviewers",
+                      style: TextStyle(
+                        fontSize: MediaQuery.of(context).size.width < 600
+                            ? 20
+                            : 24,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
@@ -461,21 +721,51 @@ class _DashboardState extends State<Dashboard> {
                 onTap: () => role == 'interviewer'
                     ? _showAddStaffDialog(role)
                     : _showAddStudentDialog(),
-                child: Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: AppTheme.bentoDecoration(
-                    color: AppTheme.bentoSurface,
-                    radius: 32,
-                  ),
-                  child: const Icon(Icons.add, size: 32),
-                ),
+                child:
+                    Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: AppTheme.bentoDecoration(
+                            color: AppTheme.bentoSurface,
+                            radius: 32,
+                          ),
+                          child: const Icon(Icons.add, size: 32),
+                        )
+                        .animate()
+                        .fade(delay: 200.ms)
+                        .scale(curve: Curves.easeOutBack),
               ),
             ],
           ],
         ),
         const SizedBox(height: 24),
+
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                if (role == 'interviewee') ...[
+                  _buildFilterChip(
+                    "Stack",
+                    _selectedStackFilter,
+                    ['All', ..._stackOptions],
+                    (val) => setState(() => _selectedStackFilter = val),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildFilterChip(
+                    "Status",
+                    _selectedRemainStatusFilter,
+                    ['All', ..._remainStatusOptions],
+                    (val) => setState(() => _selectedRemainStatusFilter = val),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
         Container(
-          constraints: const BoxConstraints(maxHeight: 500),
           padding: const EdgeInsets.all(24),
           decoration: AppTheme.bentoDecoration(
             color: AppTheme.bentoSurface,
@@ -484,95 +774,124 @@ class _DashboardState extends State<Dashboard> {
           child: StreamBuilder<List<UserModel>>(
             stream: _dataService.getUsersByRole(role),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting)
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
-              final users = snapshot.data ?? [];
+              }
+              final allUsers = snapshot.data ?? [];
+
+              // Apply Filters
+              final users = allUsers.where((user) {
+                if (user is! StudentModel) return true;
+                if (_selectedStackFilter != 'All' &&
+                    user.stack.trim().toLowerCase() !=
+                        _selectedStackFilter.trim().toLowerCase()) {
+                  // Case insensitive check
+                  return false;
+                }
+                if (_selectedRemainStatusFilter != 'All' &&
+                    user.remainStatus != _selectedRemainStatusFilter) {
+                  return false;
+                }
+                return true;
+              }).toList();
 
               return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
                 itemCount: users.length,
                 itemBuilder: (context, index) {
                   final user = users[index];
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
-                    child: InkWell(
-                      onTap: user is StudentModel
-                          ? () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ProfilePage(student: user),
+                    child:
+                        InkWell(
+                              onTap: user is StudentModel
+                                  ? () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              StudentProfilePage(student: user),
+                                        ),
+                                      );
+                                    }
+                                  : null,
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: AppTheme.bentoDecoration(
+                                  color: AppTheme.softWhite,
+                                  radius: 20,
                                 ),
-                              );
-                            }
-                          : null,
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: AppTheme.bentoDecoration(
-                          color: AppTheme.softWhite,
-                          radius: 20,
-                        ),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: AppTheme.bentoBg,
-                              child: Icon(
-                                user is StudentModel
-                                    ? Icons.person
-                                    : Icons.badge,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    user.name.isNotEmpty
-                                        ? user.name
-                                        : (user is StudentModel
-                                              ? "Student"
-                                              : user.role.name[0]
-                                                        .toUpperCase() +
-                                                    user.role.name.substring(
-                                                      1,
-                                                    )),
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      backgroundColor: AppTheme.bentoBg,
+                                      child: Icon(
+                                        user is StudentModel
+                                            ? Icons.person
+                                            : Icons.badge,
+                                        color: Colors.grey[600],
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    user.email,
-                                    style: const TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            user.name.isNotEmpty
+                                                ? user.name
+                                                : (user is StudentModel
+                                                      ? "Candidate"
+                                                      : user.role.name[0]
+                                                                .toUpperCase() +
+                                                            user.role.name
+                                                                .substring(1)),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            user.email,
+                                            style: const TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 12,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.edit_outlined,
+                                        color: Colors.blue[300],
+                                        size: 20,
+                                      ),
+                                      onPressed: () =>
+                                          _showEditUserDialog(user),
+                                    ),
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.red[300],
+                                        size: 20,
+                                      ),
+                                      onPressed: () =>
+                                          _showDeleteConfirmation(user.uid),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                Icons.edit_outlined,
-                                color: Colors.blue[300],
-                                size: 20,
-                              ),
-                              onPressed: () => _showEditUserDialog(user),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                Icons.delete_outline,
-                                color: Colors.red[300],
-                                size: 20,
-                              ),
-                              onPressed: () =>
-                                  _showDeleteConfirmation(user.uid),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                            )
+                            .animate()
+                            .fade(delay: (index * 50).ms)
+                            .slideY(begin: 0.1, end: 0),
                   );
                 },
               );
@@ -590,6 +909,8 @@ class _DashboardState extends State<Dashboard> {
     final passController = TextEditingController();
     final nameController = TextEditingController();
     final stackController = TextEditingController();
+    // Default Status
+    String selectedStatus = _remainStatusOptions.first;
 
     showDialog(
       context: context,
@@ -630,8 +951,11 @@ class _DashboardState extends State<Dashboard> {
                 ),
               ),
               const SizedBox(height: 16),
-              TextField(
-                controller: stackController,
+              // Replaced TextField with Dropdown
+              DropdownButtonFormField<String>(
+                value: _stackOptions.contains(stackController.text)
+                    ? stackController.text
+                    : null,
                 decoration: InputDecoration(
                   labelText: "Stack / Discipline",
                   filled: true,
@@ -641,6 +965,12 @@ class _DashboardState extends State<Dashboard> {
                     borderSide: BorderSide.none,
                   ),
                 ),
+                items: _stackOptions.map((stack) {
+                  return DropdownMenuItem(value: stack, child: Text(stack));
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) stackController.text = val;
+                },
               ),
               const SizedBox(height: 16),
               TextField(
@@ -655,6 +985,26 @@ class _DashboardState extends State<Dashboard> {
                   ),
                 ),
                 obscureText: true,
+              ),
+              const SizedBox(height: 16),
+              // Status Dropdown
+              DropdownButtonFormField<String>(
+                value: selectedStatus,
+                decoration: InputDecoration(
+                  labelText: "Status",
+                  filled: true,
+                  fillColor: AppTheme.bentoBg,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                items: _remainStatusOptions.map((status) {
+                  return DropdownMenuItem(value: status, child: Text(status));
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) selectedStatus = val;
+                },
               ),
             ],
           ),
@@ -678,8 +1028,9 @@ class _DashboardState extends State<Dashboard> {
                   passController.text,
                   nameController.text,
                   stackController.text,
+                  selectedStatus,
                 );
-                if (mounted) Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
               } catch (e) {
                 // handle error
               }
@@ -772,7 +1123,7 @@ class _DashboardState extends State<Dashboard> {
                   nameController.text,
                   role == 'interviewer' ? UserRole.interviewer : UserRole.admin,
                 );
-                if (mounted) Navigator.pop(context);
+                if (context.mounted) Navigator.pop(context);
               } catch (e) {
                 // handle error
               }
@@ -789,6 +1140,10 @@ class _DashboardState extends State<Dashboard> {
     final stackController = TextEditingController(
       text: user is StudentModel ? user.stack : "",
     );
+    // Status Variable for Edit
+    String selectedStatus = user is StudentModel
+        ? user.remainStatus
+        : 'Main Project';
 
     showDialog(
       context: context,
@@ -804,6 +1159,20 @@ class _DashboardState extends State<Dashboard> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
+                controller: TextEditingController(text: user.email),
+                readOnly: true,
+                decoration: InputDecoration(
+                  labelText: "Email (Read-Only)",
+                  filled: true,
+                  fillColor: Colors.grey[200],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
                 controller: nameController,
                 decoration: InputDecoration(
                   labelText: "Name",
@@ -817,8 +1186,11 @@ class _DashboardState extends State<Dashboard> {
               ),
               const SizedBox(height: 16),
               if (user is StudentModel) ...[
-                TextField(
-                  controller: stackController,
+                // Replaced TextField with Dropdown for Edit
+                DropdownButtonFormField<String>(
+                  value: _stackOptions.contains(stackController.text)
+                      ? stackController.text
+                      : null,
                   decoration: InputDecoration(
                     labelText: "Stack / Discipline",
                     filled: true,
@@ -828,6 +1200,33 @@ class _DashboardState extends State<Dashboard> {
                       borderSide: BorderSide.none,
                     ),
                   ),
+                  items: _stackOptions.map((stack) {
+                    return DropdownMenuItem(value: stack, child: Text(stack));
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) stackController.text = val;
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: _remainStatusOptions.contains(selectedStatus)
+                      ? selectedStatus
+                      : null,
+                  decoration: InputDecoration(
+                    labelText: "Status",
+                    filled: true,
+                    fillColor: AppTheme.bentoBg,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: _remainStatusOptions.map((status) {
+                    return DropdownMenuItem(value: status, child: Text(status));
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) selectedStatus = val;
+                  },
                 ),
               ],
             ],
@@ -853,6 +1252,7 @@ class _DashboardState extends State<Dashboard> {
                   email: user.email,
                   name: nameController.text,
                   stack: stackController.text,
+                  remainStatus: selectedStatus,
                   randomId: user.randomId,
                   notifications: user.notifications,
                 );
@@ -865,7 +1265,7 @@ class _DashboardState extends State<Dashboard> {
                 );
               }
               await _dataService.updateUser(updatedUser);
-              if (mounted) Navigator.pop(context);
+              if (context.mounted) Navigator.pop(context);
             },
             child: const Text("SAVE", style: TextStyle(color: Colors.white)),
           ),
@@ -943,13 +1343,12 @@ class _DashboardState extends State<Dashboard> {
 
     if (confirm == true) {
       await _authService.signOut();
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const WelcomePage()),
-          (route) => false,
-        );
-      }
+      if (!context.mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage(userType: "Admin")),
+        (route) => false,
+      );
     }
   }
 
@@ -957,6 +1356,7 @@ class _DashboardState extends State<Dashboard> {
     final titleController = TextEditingController();
     final messageController = TextEditingController();
     String targetRole = 'all';
+    final isMobile = MediaQuery.of(context).size.width < 600;
 
     final presets = [
       {
@@ -991,43 +1391,52 @@ class _DashboardState extends State<Dashboard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(isMobile ? 16 : 24),
             decoration: AppTheme.bentoDecoration(
               color: AppTheme.bentoJacket,
               radius: 32,
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.campaign, color: Colors.white, size: 32),
-                SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Global Broadcast",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
+                Icon(
+                  Icons.campaign,
+                  color: Colors.white,
+                  size: isMobile ? 24 : 32,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Global Broadcast",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isMobile ? 18 : 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    Text(
-                      "Send instant alerts to users",
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                  ],
+                      const Text(
+                        "Send instant alerts to users",
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             "Quick Presets",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: isMobile ? 16 : 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 100,
+            height: isMobile ? 90 : 100,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               itemCount: presets.length,
@@ -1041,10 +1450,10 @@ class _DashboardState extends State<Dashboard> {
                       messageController.text = p['msg'] as String;
                     },
                     child: Container(
-                      width: 160,
+                      width: isMobile ? 140 : 160,
                       padding: const EdgeInsets.all(12),
                       decoration: AppTheme.bentoDecoration(
-                        color: (p['color'] as Color).withOpacity(0.1),
+                        color: (p['color'] as Color).withValues(alpha: 0.1),
                         radius: 20,
                       ),
                       child: Column(
@@ -1057,8 +1466,9 @@ class _DashboardState extends State<Dashboard> {
                           const SizedBox(height: 4),
                           Text(
                             p['title'] as String,
+                            textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: isMobile ? 11 : 12,
                               fontWeight: FontWeight.bold,
                               color: p['color'] as Color,
                             ),
@@ -1073,7 +1483,7 @@ class _DashboardState extends State<Dashboard> {
           ),
           const SizedBox(height: 24),
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(isMobile ? 16 : 24),
             decoration: AppTheme.bentoDecoration(
               color: AppTheme.bentoSurface,
               radius: 32,
@@ -1110,7 +1520,7 @@ class _DashboardState extends State<Dashboard> {
                 StatefulBuilder(
                   builder: (context, setInnerState) {
                     return DropdownButtonFormField<String>(
-                      value: targetRole,
+                      initialValue: targetRole,
                       decoration: InputDecoration(
                         labelText: "Target Users",
                         filled: true,
@@ -1152,8 +1562,9 @@ class _DashboardState extends State<Dashboard> {
                     ),
                     onPressed: () async {
                       if (titleController.text.isEmpty ||
-                          messageController.text.isEmpty)
+                          messageController.text.isEmpty) {
                         return;
+                      }
                       await _dataService.broadcastNotification(
                         NotificationModel(
                           id: '',
@@ -1165,6 +1576,7 @@ class _DashboardState extends State<Dashboard> {
                       );
                       titleController.clear();
                       messageController.clear();
+                      if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("Broadcast Sent!")),
                       );
@@ -1187,96 +1599,124 @@ class _DashboardState extends State<Dashboard> {
   }
 
   Widget _buildPublishScreen(ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(32),
-            decoration: AppTheme.bentoDecoration(
-              color: AppTheme.bentoAccent,
-              radius: 40,
-            ),
-            child: Column(
-              children: [
-                const Icon(Icons.publish, color: Colors.white, size: 64),
-                const SizedBox(height: 16),
-                const Text(
-                  "Results Visibility",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+        final double containerPadding = isMobile ? 16 : 32;
+        final double titleSize = isMobile ? 20 : 24;
+        final double statusSize = isMobile ? 14 : 18;
+        final double iconSize = isMobile ? 48 : 64;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            children: [
+              Container(
+                padding: EdgeInsets.all(containerPadding),
+                decoration: AppTheme.bentoDecoration(
+                  color: AppTheme.bentoAccent,
+                  radius: 40,
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  "Control when students can view their final assessment marks.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white70),
-                ),
-                const SizedBox(height: 32),
-                StreamBuilder<bool>(
-                  stream: _dataService.getResultsPublishedStream(),
-                  builder: (context, snapshot) {
-                    final isPublished = snapshot.data ?? false;
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
+                child: Column(
+                  children: [
+                    Icon(Icons.publish, color: Colors.white, size: iconSize),
+                    const SizedBox(height: 16),
+                    Text(
+                      "Results Visibility",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: titleSize,
+                        fontWeight: FontWeight.bold,
                       ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(24),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Control when students can view their final assessment marks.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: isMobile ? 13 : 14,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            isPublished ? "STATUS: LIVE" : "STATUS: RESTRICTED",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-                              letterSpacing: 2,
-                            ),
+                    ),
+                    const SizedBox(height: 32),
+                    StreamBuilder<bool>(
+                      stream: _dataService.getResultsPublishedStream(),
+                      builder: (context, snapshot) {
+                        final isPublished = snapshot.data ?? false;
+                        return Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isMobile ? 16 : 24,
+                            vertical: 16,
                           ),
-                          Switch(
-                            value: isPublished,
-                            activeColor: Colors.greenAccent,
-                            onChanged: (val) => _confirmPublishResults(val),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(24),
                           ),
-                        ],
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  isPublished
+                                      ? "STATUS: LIVE"
+                                      : "STATUS: RESTRICTED",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: statusSize,
+                                    letterSpacing: 1.5,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Switch(
+                                value: isPublished,
+                                activeThumbColor: Colors.greenAccent,
+                                onChanged: (val) => _confirmPublishResults(val),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: EdgeInsets.all(containerPadding),
+                decoration: AppTheme.bentoDecoration(
+                  color: AppTheme.bentoSurface,
+                  radius: 32,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Guidelines",
+                      style: TextStyle(
+                        fontSize: isMobile ? 16 : 18,
+                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                  },
+                    ),
+                    const SizedBox(height: 16),
+                    const BulletItem(
+                      "Ensure all interviewers have submitted marks.",
+                    ),
+                    const BulletItem(
+                      "Unpublishing will hide results immediately.",
+                    ),
+                    const BulletItem(
+                      "Students will receive a notification if enabled.",
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: AppTheme.bentoDecoration(
-              color: AppTheme.bentoSurface,
-              radius: 32,
-            ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "Guidelines",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 16),
-                BulletItem("Ensure all interviewers have submitted marks."),
-                BulletItem("Unpublishing will hide results immediately."),
-                BulletItem("Students will receive a notification if enabled."),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -1318,6 +1758,149 @@ class _DashboardState extends State<Dashboard> {
       await _dataService.updateResultsPublished(value);
     }
   }
+
+  Widget _buildFilterChip(
+    String label,
+    String selectedValue,
+    List<String> options,
+    ValueChanged<String> onSelected,
+  ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            "$label: ",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+              fontSize: 12,
+            ),
+          ),
+          DropdownButton<String>(
+            value: selectedValue,
+            underline: const SizedBox(),
+            isDense: true,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontWeight: FontWeight.w500,
+              fontSize: 13,
+            ),
+            items: options.map((e) {
+              return DropdownMenuItem(value: e, child: Text(e));
+            }).toList(),
+            onChanged: (val) {
+              if (val != null) onSelected(val);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReportsScreen(ThemeData theme) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: EdgeInsets.all(isMobile ? 16 : 24),
+          decoration: AppTheme.bentoDecoration(
+            color: AppTheme.bentoJacket,
+            radius: 32,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Reports & Downloads",
+                style: TextStyle(
+                  fontSize: isMobile ? 20 : 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Generate and download CSV reports based on student performance.",
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: AppTheme.bentoDecoration(
+            color: AppTheme.bentoSurface,
+            radius: 32,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Filter Options",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _buildFilterChip(
+                      "Stack",
+                      _reportStackFilter,
+                      ['All', ..._stackOptions],
+                      (val) => setState(() => _reportStackFilter = val),
+                    ),
+                    const SizedBox(width: 12),
+                    _buildFilterChip(
+                      "Status",
+                      _reportRemainStatusFilter,
+                      ['All', ..._remainStatusOptions],
+                      (val) => setState(() => _reportRemainStatusFilter = val),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text("Include Unmarked Students"),
+                value: _reportIncludeUnmarked,
+                onChanged: (val) =>
+                    setState(() => _reportIncludeUnmarked = val ?? false),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.bentoJacket,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  onPressed: _downloadCsv,
+                  icon: const Icon(Icons.download),
+                  label: const Text("GENERATE & DOWNLOAD CSV"),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class BulletItem extends StatelessWidget {
@@ -1326,21 +1909,28 @@ class BulletItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final double fontSize = isMobile ? 14 : 16;
+    final double bulletSize = isMobile ? 16 : 18;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             "• ",
             style: TextStyle(
-              fontSize: 18,
+              fontSize: bulletSize,
               fontWeight: FontWeight.bold,
               color: AppTheme.bentoJacket,
             ),
           ),
           Expanded(
-            child: Text(text, style: const TextStyle(color: Colors.black87)),
+            child: Text(
+              text,
+              style: TextStyle(color: Colors.black87, fontSize: fontSize),
+            ),
           ),
         ],
       ),

@@ -92,14 +92,14 @@ class _NavbarHomeState extends State<NavbarHome> {
           const SizedBox(height: 48),
           _buildSidebarItem(0, Icons.psychology, "Aptitude"),
           _buildSidebarItem(1, Icons.groups, "Group Disc."),
-          _buildSidebarItem(2, Icons.person_search, "HR Round"),
+          _buildSidebarItem(2, Icons.person_search, "Technical / HR"),
           const Spacer(),
           Padding(
             padding: const EdgeInsets.all(24),
             child: Text(
               "Confidential",
               style: TextStyle(
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 fontSize: 12,
               ),
             ),
@@ -120,7 +120,7 @@ class _NavbarHomeState extends State<NavbarHome> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
             color: isSelected
-                ? Colors.white.withOpacity(0.15)
+                ? Colors.white.withValues(alpha: 0.15)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
           ),
@@ -128,11 +128,17 @@ class _NavbarHomeState extends State<NavbarHome> {
             children: [
               Icon(icon, color: isSelected ? Colors.white : Colors.white60),
               const SizedBox(width: 16),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.white60,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.white60,
+                    fontWeight: isSelected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -144,7 +150,7 @@ class _NavbarHomeState extends State<NavbarHome> {
 
   Widget _buildMobileNavbar() {
     return Container(
-      margin: const EdgeInsets.all(24),
+      margin: const EdgeInsets.all(16),
       decoration: AppTheme.bentoDecoration(
         color: Colors.white,
         radius: 40,
@@ -157,7 +163,7 @@ class _NavbarHomeState extends State<NavbarHome> {
           backgroundColor: Colors.white,
           selectedItemColor: AppTheme.bentoJacket,
           unselectedItemColor: Colors.grey,
-          showUnselectedLabels: false,
+          showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,
           elevation: 0,
           onTap: (index) => setState(() => _currentIndex = index),
@@ -169,7 +175,7 @@ class _NavbarHomeState extends State<NavbarHome> {
             BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'GD'),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_search),
-              label: 'HR',
+              label: 'Tech/HR',
             ),
           ],
         ),
@@ -200,10 +206,14 @@ class _NavbarHomeState extends State<NavbarHome> {
                 const Text(
                   "Assessment Mode",
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   widget.studentName,
-                  style: TextStyle(color: Colors.black54, fontSize: 12),
+                  style: const TextStyle(color: Colors.black54, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),

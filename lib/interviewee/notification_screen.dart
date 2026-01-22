@@ -18,150 +18,179 @@ class _NotificationScreenState extends State<NotificationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.bentoBg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(Icons.notifications_none, size: 28),
-                  ),
-                  const SizedBox(width: 16),
-                  const Text(
-                    "Notifications",
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 600;
+          final double horizontalPadding = isMobile ? 16 : 24;
 
-            Expanded(
-              child: StreamBuilder<List<NotificationModel>>(
-                stream: _dataService.getNotifications(widget.userRole),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+          return SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: Column(
+                  children: [
+                    // Header
+                    Padding(
+                      padding: EdgeInsets.all(horizontalPadding),
+                      child: Row(
                         children: [
-                          Icon(
-                            Icons.notifications_off_outlined,
-                            size: 48,
-                            color: Colors.grey[400],
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 10,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.notifications_none,
+                              size: 28,
+                            ),
                           ),
-                          const SizedBox(height: 16),
-                          Text(
-                            "No notifications yet",
-                            style: TextStyle(color: Colors.grey[600]),
+                          const SizedBox(width: 16),
+                          const Text(
+                            "Notifications",
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
                           ),
                         ],
                       ),
-                    );
-                  }
+                    ),
 
-                  final notifications = snapshot.data!;
+                    Expanded(
+                      child: StreamBuilder<List<NotificationModel>>(
+                        stream: _dataService.getNotifications(widget.userRole),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
 
-                  return ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    itemCount: notifications.length,
-                    separatorBuilder: (c, i) => const SizedBox(height: 16),
-                    itemBuilder: (context, index) {
-                      final notif = notifications[index];
-                      // Format timestamp
-                      final timeAgo = DateTime.now()
-                          .difference(notif.timestamp)
-                          .inMinutes;
-
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: AppTheme.bentoDecoration(
-                          color: Colors.white,
-                          radius: 24,
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: AppTheme.bentoJacket.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.campaign,
-                                color: AppTheme.bentoJacket,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
+                          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                            return Center(
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        notif.title,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                      Text(
-                                        "${timeAgo}m ago",
-                                        style: TextStyle(
-                                          color: Colors.grey[400],
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
+                                  Icon(
+                                    Icons.notifications_off_outlined,
+                                    size: 48,
+                                    color: Colors.grey[400],
                                   ),
-                                  const SizedBox(height: 4),
+                                  const SizedBox(height: 16),
                                   Text(
-                                    notif.message,
-                                    style: const TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 13,
-                                    ),
+                                    "No notifications yet",
+                                    style: TextStyle(color: Colors.grey[600]),
                                   ),
                                 ],
                               ),
+                            );
+                          }
+
+                          final notifications = snapshot.data!;
+
+                          return ListView.separated(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: horizontalPadding,
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                  );
-                },
+                            itemCount: notifications.length,
+                            separatorBuilder: (c, i) =>
+                                const SizedBox(height: 16),
+                            itemBuilder: (context, index) {
+                              final notif = notifications[index];
+                              // Format timestamp
+                              final timeAgo = DateTime.now()
+                                  .difference(notif.timestamp)
+                                  .inMinutes;
+
+                              return Container(
+                                padding: EdgeInsets.all(isMobile ? 12 : 16),
+                                decoration: AppTheme.bentoDecoration(
+                                  color: Colors.white,
+                                  radius: 24,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.bentoJacket.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.campaign,
+                                        color: AppTheme.bentoJacket,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  notif.title,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                "${timeAgo}m ago",
+                                                style: TextStyle(
+                                                  color: Colors.grey[400],
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            notif.message,
+                                            style: const TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 80), // Space for Nav Bar
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 80), // Space for Nav Bar
-          ],
-        ),
+          );
+        },
       ),
     );
   }

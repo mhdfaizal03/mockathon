@@ -8,7 +8,7 @@ class HrMarkPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MarkForm(
-      title: "HR Interview Round",
+      title: "Technical / HR Round",
       studentId: studentId,
       markType: 'hr',
     );

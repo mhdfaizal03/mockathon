@@ -52,6 +52,25 @@ class DataService {
     });
   }
 
+  // Fetch all Marks (One-time)
+  Future<List<MarkModel>> fetchAllMarks() async {
+    final snapshot = await _firestore.collection('marks').get();
+    return snapshot.docs.map((doc) {
+      return MarkModel.fromMap(doc.data());
+    }).toList();
+  }
+
+  // Stream all Marks for Dashboard filtering
+  Stream<Map<String, MarkModel>> getAllMarksStream() {
+    return _firestore.collection('marks').snapshots().map((snapshot) {
+      final map = <String, MarkModel>{};
+      for (var doc in snapshot.docs) {
+        map[doc.id] = MarkModel.fromMap(doc.data());
+      }
+      return map;
+    });
+  }
+
   // Broadcast Notification
   Future<void> broadcastNotification(NotificationModel note) async {
     final docRef = _firestore.collection('notifications').doc();
@@ -107,5 +126,11 @@ class DataService {
   // Delete User
   Future<void> deleteUser(String uid) async {
     await _firestore.collection('users').doc(uid).delete();
+  }
+
+  Future<void> completeOnboarding(String uid) async {
+    await _firestore.collection('users').doc(uid).update({
+      'hasCompletedOnboarding': true,
+    });
   }
 }

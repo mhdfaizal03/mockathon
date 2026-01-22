@@ -42,6 +42,7 @@ class AuthService {
     String password,
     String name,
     String stack,
+    String remainStatus,
   ) async {
     try {
       UserCredential cred = await _auth.createUserWithEmailAndPassword(
@@ -56,7 +57,9 @@ class AuthService {
           email: email,
           name: name,
           stack: stack,
+          remainStatus: remainStatus,
           randomId: randomId,
+          hasCompletedOnboarding: false,
         );
 
         await _firestore
@@ -118,5 +121,14 @@ class AuthService {
       return UserModel.fromMap(doc.data() as Map<String, dynamic>);
     }
     return null;
+  }
+
+  Stream<UserModel?> getUserProfileStream(String uid) {
+    return _firestore.collection('users').doc(uid).snapshots().map((doc) {
+      if (doc.exists) {
+        return UserModel.fromMap(doc.data() as Map<String, dynamic>);
+      }
+      return null;
+    });
   }
 }

@@ -15,10 +15,25 @@ class _RegisterPageState extends State<RegisterPage> {
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _stackController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
+  String? _selectedStack;
+  String? _selectedRemainStatus;
   bool _isLoading = false;
+
+  final List<String> _stackOptions = [
+    'UI/UX',
+    'Flutter',
+    'Python',
+    'MERN',
+    'Digital Marketing',
+    'Data Analytics',
+    'Data Science',
+  ];
+
+  final List<String> _remainStatusOptions = ['Main Project', 'Mini Project'];
 
   Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
@@ -29,7 +44,8 @@ class _RegisterPageState extends State<RegisterPage> {
           _emailController.text.trim(),
           _passwordController.text.trim(),
           _nameController.text.trim(),
-          _stackController.text.trim(),
+          _selectedStack!,
+          _selectedRemainStatus!,
         );
 
         if (mounted) {
@@ -61,6 +77,10 @@ class _RegisterPageState extends State<RegisterPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.all(10.0),
+        child: Image.asset("assets/softlogo.png", height: 100),
+      ),
       backgroundColor: AppTheme.bentoBg, // Bento Background
       appBar: AppBar(
         title: Text(
@@ -91,16 +111,22 @@ class _RegisterPageState extends State<RegisterPage> {
               child: Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    height: 150,
+                    width: 150,
+                    padding: const EdgeInsets.all(0),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppTheme.bentoJacket.withOpacity(0.1),
+                      gradient: AppTheme.lightGradient, // Professional Gradient
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.primaryColor.withValues(alpha: 0.3),
+                          blurRadius: 30,
+                          spreadRadius: 5,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
                     ),
-                    child: const Icon(
-                      Icons.person_add_alt_1,
-                      size: 48,
-                      color: AppTheme.bentoJacket,
-                    ),
+                    child: Image.asset("assets/Mockuplogo.png"),
                   ),
                   const SizedBox(height: 24),
 
@@ -125,10 +151,21 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  _buildTextField(
-                    _stackController,
-                    "Tech Stack (e.g. Flutter)",
+                  _buildDropdown(
+                    "Tech Stack",
                     Icons.code,
+                    _stackOptions,
+                    _selectedStack,
+                    (val) => setState(() => _selectedStack = val),
+                  ),
+                  const SizedBox(height: 16),
+
+                  _buildDropdown(
+                    "Remain Status",
+                    Icons.assignment,
+                    _remainStatusOptions,
+                    _selectedRemainStatus,
+                    (val) => setState(() => _selectedRemainStatus = val),
                   ),
                   const SizedBox(height: 16),
 
@@ -137,6 +174,21 @@ class _RegisterPageState extends State<RegisterPage> {
                     "Password",
                     Icons.lock,
                     isPassword: true,
+                  ),
+                  const SizedBox(height: 16),
+
+                  _buildTextField(
+                    _confirmPasswordController,
+                    "Confirm Password",
+                    Icons.lock,
+                    isPassword: true,
+                    validator: (val) {
+                      if (val == null || val.isEmpty) return "Required";
+                      if (val != _passwordController.text) {
+                        return "Passwords do not match";
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: 32),
 
@@ -175,6 +227,7 @@ class _RegisterPageState extends State<RegisterPage> {
     IconData icon, {
     bool isPassword = false,
     bool isEmail = false,
+    String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
@@ -194,12 +247,51 @@ class _RegisterPageState extends State<RegisterPage> {
           borderSide: BorderSide.none,
         ),
       ),
-      validator: (v) {
-        if (v == null || v.isEmpty) return "Required";
-        if (isEmail && !v.contains("@")) return "Invalid Email";
-        if (isPassword && v.length < 6) return "Min 6 chars";
-        return null;
-      },
+      validator:
+          validator ??
+          (v) {
+            if (v == null || v.isEmpty) return "Required";
+            if (isEmail && !v.contains("@")) return "Invalid Email";
+            if (isPassword && v.length < 6) return "Min 6 chars";
+            return null;
+          },
+    );
+  }
+
+  Widget _buildDropdown(
+    String label,
+    IconData icon,
+    List<String> items,
+    String? value,
+    ValueChanged<String?> onChanged,
+  ) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      items: items
+          .map(
+            (e) => DropdownMenuItem(
+              value: e,
+              child: Text(e, overflow: TextOverflow.ellipsis),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: Colors.grey),
+        filled: true,
+        fillColor: AppTheme.bentoBg,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      validator: (v) => v == null ? "Required" : null,
+      isExpanded: true,
     );
   }
 }

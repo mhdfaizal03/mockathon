@@ -4,17 +4,25 @@ class UserModel {
   final String uid;
   final String email;
   final UserRole role;
-  final String name; // Added name field
+  final String name;
+  final bool hasCompletedOnboarding; // New flag
 
   UserModel({
     required this.uid,
     required this.email,
     required this.role,
     this.name = '',
+    this.hasCompletedOnboarding = true, // Default true for staff
   });
 
   Map<String, dynamic> toMap() {
-    return {'uid': uid, 'email': email, 'role': role.name, 'name': name};
+    return {
+      'uid': uid,
+      'email': email,
+      'role': role.name,
+      'name': name,
+      'hasCompletedOnboarding': hasCompletedOnboarding,
+    };
   }
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
@@ -22,6 +30,7 @@ class UserModel {
       uid: map['uid'] ?? '',
       email: map['email'] ?? '',
       name: map['name'] ?? '',
+      hasCompletedOnboarding: map['hasCompletedOnboarding'] ?? true,
       role: UserRole.values.firstWhere(
         (e) => e.name == map['role'],
         orElse: () => UserRole.interviewee,
@@ -32,23 +41,27 @@ class UserModel {
 
 class StudentModel extends UserModel {
   final String stack;
+  final String remainStatus;
   final String randomId;
   final List<String> notifications;
 
   StudentModel({
-    required String uid,
-    required String email,
-    required String name,
+    required super.uid,
+    required super.email,
+    required super.name,
     required this.stack,
+    required this.remainStatus,
     required this.randomId,
     this.notifications = const [],
-  }) : super(uid: uid, email: email, name: name, role: UserRole.interviewee);
+    super.hasCompletedOnboarding = false,
+  }) : super(role: UserRole.interviewee);
 
   @override
   Map<String, dynamic> toMap() {
     final map = super.toMap();
     map.addAll({
       'stack': stack,
+      'remainStatus': remainStatus,
       'randomId': randomId,
       'notifications': notifications,
     });
@@ -61,8 +74,10 @@ class StudentModel extends UserModel {
       email: map['email'] ?? '',
       name: map['name'] ?? '',
       stack: map['stack'] ?? '',
+      remainStatus: map['remainStatus'] ?? 'Main Project',
       randomId: map['randomId'] ?? '',
       notifications: List<String>.from(map['notifications'] ?? []),
+      hasCompletedOnboarding: map['hasCompletedOnboarding'] ?? false,
     );
   }
 }

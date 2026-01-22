@@ -31,7 +31,7 @@ class _NavScreenState extends State<NavScreen> {
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
-              margin: const EdgeInsets.all(24),
+              margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: AppTheme.bentoDecoration(
                 color: AppTheme.cardLight,
@@ -56,6 +56,13 @@ class _NavScreenState extends State<NavScreen> {
                   ),
                 ],
               ),
+            ),
+          ),
+          Positioned(
+            top: 16,
+            left: 16,
+            child: SafeArea(
+              child: Image.asset('assets/softlogo.png', height: 60),
             ),
           ),
         ],

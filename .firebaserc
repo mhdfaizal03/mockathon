@@ -1,0 +1,21 @@
+{
+  "projects": {
+    "default": "mockathon-dc9a3"
+  },
+  "targets": {
+    "mockathon-dc9a3": {
+      "hosting": {
+        "admin": [
+          "adminmockathon"
+        ],
+        "interviewer": [
+          "interviewermockathon"
+        ],
+        "interviewee": [
+          "intervieweemockathon"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}

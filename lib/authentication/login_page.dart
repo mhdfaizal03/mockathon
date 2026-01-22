@@ -4,9 +4,11 @@ import 'package:mockathon/models/user_models.dart';
 import 'package:mockathon/services/auth_service.dart';
 import 'package:mockathon/authentication/register_page.dart';
 import 'package:mockathon/admin/dashboard.dart';
-import 'package:mockathon/interviewer/home_page.dart';
+
 import 'package:mockathon/interviewee/nav_screen.dart';
-import 'package:mockathon/authentication/welcome_page.dart';
+import 'package:mockathon/interviewer/interviewer_nav_screen.dart';
+
+import 'package:mockathon/interviewee/onboarding_screen.dart';
 
 class LoginPage extends StatefulWidget {
   final String userType;
@@ -60,7 +62,8 @@ class _LoginPageState extends State<LoginPage> {
               user.role != UserRole.interviewer) {
             roleMismatch = true;
           }
-          if (widget.userType == "Interviewee" &&
+          if ((widget.userType == "Interviewee" ||
+                  widget.userType == "Candidate") &&
               user.role != UserRole.interviewee) {
             roleMismatch = true;
           }
@@ -93,10 +96,14 @@ class _LoginPageState extends State<LoginPage> {
               targetPage = const Dashboard();
               break;
             case UserRole.interviewer:
-              targetPage = const HomePage();
+              targetPage = const InterviewerNavScreen();
               break;
             case UserRole.interviewee:
-              targetPage = const NavScreen();
+              if (!user.hasCompletedOnboarding) {
+                targetPage = const OnboardingScreen();
+              } else {
+                targetPage = const NavScreen();
+              }
               break;
           }
 
@@ -136,23 +143,15 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isAdmin = widget.userType == "Admin";
-    final isInterviewee = widget.userType == "Interviewee";
+    final isInterviewee =
+        widget.userType == "Interviewee" || widget.userType == "Candidate";
 
     return Scaffold(
       backgroundColor: AppTheme.bentoBg, // Bento Background
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (_) => const WelcomePage()),
-              (route) => false,
-            );
-          },
-        ),
+        automaticallyImplyLeading: false,
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -162,28 +161,24 @@ class _LoginPageState extends State<LoginPage> {
             children: [
               // Logo/Icon
               Container(
-                padding: const EdgeInsets.all(20),
+                height: 150,
+                width: 150,
+                padding: const EdgeInsets.all(0),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: AppTheme.lightGradient, // Professional Gradient
                   boxShadow: [
                     BoxShadow(
-                      color: theme.primaryColor.withOpacity(0.3),
+                      color: theme.primaryColor.withValues(alpha: 0.3),
                       blurRadius: 30,
                       spreadRadius: 5,
                       offset: const Offset(0, 10),
                     ),
                   ],
                 ),
-                child: Icon(
-                  isAdmin
-                      ? Icons.admin_panel_settings
-                      : (isInterviewee ? Icons.school : Icons.badge),
-                  size: 64,
-                  color: Colors.white,
-                ),
+                child: Image.asset("assets/Mockuplogo.png"),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 10),
 
               Text(
                 "${widget.userType} Login",
@@ -196,7 +191,7 @@ class _LoginPageState extends State<LoginPage> {
                   color: Colors.grey[600],
                 ),
               ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 30),
 
               // Form Container (Bento Style)
               Container(
@@ -305,7 +300,7 @@ class _LoginPageState extends State<LoginPage> {
                             );
                           },
                           child: Text(
-                            "Create Student Account",
+                            "Create Candidate Account",
                             style: TextStyle(
                               color: AppTheme.bentoJacket,
                               fontWeight: FontWeight.bold,
@@ -320,6 +315,10 @@ class _LoginPageState extends State<LoginPage> {
             ],
           ),
         ),
+      ),
+      bottomNavigationBar: Padding(
+        padding: const EdgeInsets.all(10.0),
+        child: Image.asset("assets/softlogo.png", height: 100),
       ),
     );
   }
