@@ -45,11 +45,10 @@ class _InterviewerNavScreenState extends State<InterviewerNavScreen> {
                 alignment: Alignment.bottomCenter,
                 child: _buildMobileNav(),
               ),
-              Positioned(
-                top: 16,
-                left: 16,
+              Align(
+                alignment: Alignment.topCenter,
                 child: SafeArea(
-                  child: Image.asset('assets/softlogo.png', height: 60),
+                  child: Image.asset('assets/softlogowhite.png', height: 120),
                 ),
               ),
             ],
@@ -85,10 +84,10 @@ class _InterviewerNavScreenState extends State<InterviewerNavScreen> {
           _buildSidebarItem(1, Icons.notifications, "Alerts"),
           const Spacer(),
           _buildSidebarItem(-1, Icons.logout, "Logout"),
-          const SizedBox(height: 24),
+
           Padding(
-            padding: const EdgeInsets.only(bottom: 24),
-            child: Image.asset('assets/softlogo.png', height: 80),
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Image.asset('assets/softlogowhite.png', height: 120),
           ),
           const SizedBox(height: 12),
         ],
@@ -113,7 +112,7 @@ class _InterviewerNavScreenState extends State<InterviewerNavScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
             color: isSelected
-                ? Colors.white.withValues(alpha: 0.15)
+                ? Colors.white.withOpacity(0.15)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
           ),

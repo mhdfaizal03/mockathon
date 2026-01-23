@@ -131,6 +131,7 @@ class NotificationModel {
   final String
   targetRole; // 'all', 'interviewee', 'interviewer', or specific UID
   final String type; // 'info', 'alert', 'success'
+  final double? minMarks;
 
   NotificationModel({
     required this.id,
@@ -139,6 +140,7 @@ class NotificationModel {
     required this.timestamp,
     required this.targetRole,
     this.type = 'info',
+    this.minMarks,
   });
 
   Map<String, dynamic> toMap() {
@@ -149,6 +151,7 @@ class NotificationModel {
       'timestamp': timestamp.toIso8601String(),
       'targetRole': targetRole,
       'type': type,
+      'minMarks': minMarks,
     };
   }
 
@@ -160,6 +163,7 @@ class NotificationModel {
       timestamp: DateTime.tryParse(map['timestamp'] ?? '') ?? DateTime.now(),
       targetRole: map['targetRole'] ?? 'all',
       type: map['type'] ?? 'info',
+      minMarks: map['minMarks']?.toDouble(),
     );
   }
 }

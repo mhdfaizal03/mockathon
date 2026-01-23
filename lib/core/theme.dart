@@ -58,14 +58,14 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: cardDark.withValues(alpha: 0.5),
+        fillColor: cardDark.withOpacity(0.5),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: textGrey.withValues(alpha: 0.2)),
+          borderSide: BorderSide(color: textGrey.withOpacity(0.2)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: textGrey.withValues(alpha: 0.2)),
+          borderSide: BorderSide(color: textGrey.withOpacity(0.2)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -131,11 +131,11 @@ class AppTheme {
         fillColor: Colors.white,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: textLightGrey.withValues(alpha: 0.3)),
+          borderSide: BorderSide(color: textLightGrey.withOpacity(0.3)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: textLightGrey.withValues(alpha: 0.3)),
+          borderSide: BorderSide(color: textLightGrey.withOpacity(0.3)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -149,7 +149,7 @@ class AppTheme {
           backgroundColor: primaryIndigo,
           foregroundColor: Colors.white,
           elevation: 2,
-          shadowColor: primaryIndigo.withValues(alpha: 0.3),
+          shadowColor: primaryIndigo.withOpacity(0.3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
           ),
@@ -179,11 +179,11 @@ class AppTheme {
   // Glassmorphic / Modern Card Decoration (Light)
   static BoxDecoration modernDecoration({double opacity = 1.0}) {
     return BoxDecoration(
-      color: Colors.white.withValues(alpha: opacity),
+      color: Colors.white.withOpacity(opacity),
       borderRadius: BorderRadius.circular(15),
       boxShadow: [
         BoxShadow(
-          color: const Color(0xFF64748B).withValues(alpha: 0.1), // Slate shadow
+          color: const Color(0xFF64748B).withOpacity(0.1), // Slate shadow
           blurRadius: 20,
           offset: const Offset(0, 10),
           spreadRadius: 0,
@@ -196,12 +196,12 @@ class AppTheme {
   // Glassmorphic Decoration (Legacy Dark)
   static BoxDecoration glassDecoration({double opacity = 0.1}) {
     return BoxDecoration(
-      color: Colors.white.withValues(alpha: opacity),
+      color: Colors.white.withOpacity(opacity),
       borderRadius: BorderRadius.circular(15),
-      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      border: Border.all(color: Colors.white.withOpacity(0.1)),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.2),
+          color: Colors.black.withOpacity(0.2),
           blurRadius: 16,
           offset: const Offset(0, 8),
         ),
@@ -218,16 +218,16 @@ class AppTheme {
     return BoxDecoration(
       color: color,
       borderRadius: BorderRadius.circular(radius),
-      border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+      border: Border.all(color: Colors.black.withOpacity(0.05)),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.04),
+          color: Colors.black.withOpacity(0.04),
           blurRadius: 8,
           offset: const Offset(0, 4),
         ),
         if (shadow)
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),

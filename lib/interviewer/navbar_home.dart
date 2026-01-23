@@ -99,7 +99,7 @@ class _NavbarHomeState extends State<NavbarHome> {
             child: Text(
               "Confidential",
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.3),
+                color: Colors.white.withOpacity(0.3),
                 fontSize: 12,
               ),
             ),
@@ -120,7 +120,7 @@ class _NavbarHomeState extends State<NavbarHome> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
             color: isSelected
-                ? Colors.white.withValues(alpha: 0.15)
+                ? Colors.white.withOpacity(0.15)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
           ),

@@ -12,7 +12,11 @@ class DataService {
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map((doc) {
-            return UserModel.fromMap(doc.data());
+            final data = doc.data();
+            if (role == 'interviewee' || data['role'] == 'interviewee') {
+              return StudentModel.fromMap(data);
+            }
+            return UserModel.fromMap(data);
           }).toList();
         });
   }
@@ -81,6 +85,7 @@ class DataService {
       timestamp: DateTime.now(),
       targetRole: note.targetRole,
       type: note.type,
+      minMarks: note.minMarks,
     );
     await docRef.set(newNote.toMap());
   }

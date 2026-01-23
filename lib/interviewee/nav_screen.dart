@@ -58,13 +58,6 @@ class _NavScreenState extends State<NavScreen> {
               ),
             ),
           ),
-          Positioned(
-            top: 16,
-            left: 16,
-            child: SafeArea(
-              child: Image.asset('assets/softlogo.png', height: 60),
-            ),
-          ),
         ],
       ),
     );

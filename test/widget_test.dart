@@ -1,30 +1,16 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:mockathon/main.dart';
+import 'package:mockathon/core/splash_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MockathonApp());
+  testWidgets('Splash Screen Smoke Test', (WidgetTester tester) async {
+    // Build Splash Screen
+    await tester.pumpWidget(const MaterialApp(home: SplashScreen()));
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Verify Center Logo (Mockuplogo) is present
+    expect(find.byType(Image), findsNWidgets(2)); // Expecting 2 images
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // We can't easily check asset paths in widget tests without more setup,
+    // but finding 2 images is a good smoke test for now (Mockuplogo + softlogo).
   });
 }

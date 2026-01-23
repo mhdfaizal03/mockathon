@@ -56,17 +56,17 @@ class _AddInternsState extends State<AddInterns> {
   InputDecoration _buildInputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
-      labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
-      prefixIcon: Icon(icon, color: Colors.white.withValues(alpha: 0.5)),
+      labelStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+      prefixIcon: Icon(icon, color: Colors.white.withOpacity(0.5)),
       filled: true,
-      fillColor: Colors.white.withValues(alpha: 0.05),
+      fillColor: Colors.white.withOpacity(0.05),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+        borderSide: BorderSide(color: Colors.white.withOpacity(0.1)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -91,14 +91,12 @@ class _AddInternsState extends State<AddInterns> {
                 width: isDesktop ? 500 : double.infinity,
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.05),
+                  color: Colors.white.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.1),
-                  ),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.2),
+                      color: Colors.black.withOpacity(0.2),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -118,7 +116,7 @@ class _AddInternsState extends State<AddInterns> {
                             color: Colors.white,
                             shadows: [
                               Shadow(
-                                color: accentPurple.withValues(alpha: 0.5),
+                                color: accentPurple.withOpacity(0.5),
                                 blurRadius: 10,
                               ),
                             ],
@@ -228,9 +226,7 @@ class _AddInternsState extends State<AddInterns> {
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(
-                                0xFFFF5722,
-                              ).withValues(alpha: 0.3),
+                              color: const Color(0xFFFF5722).withOpacity(0.3),
                               blurRadius: 10,
                               offset: const Offset(0, 5),
                             ),

@@ -5,10 +5,17 @@ import 'package:mockathon/services/data_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:mockathon/models/user_models.dart';
 import 'dart:convert';
-import 'dart:html' as html;
+import 'dart:html'
+    if (dart.library.io) 'package:mockathon/core/web_stub.dart'
+    as html;
 
 import 'package:mockathon/admin/student_profile_page.dart';
 import 'package:mockathon/authentication/login_page.dart';
+import 'package:csv/csv.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io' show Platform, File;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -20,16 +27,42 @@ class Dashboard extends StatefulWidget {
 class _DashboardState extends State<Dashboard> {
   final DataService _dataService = DataService();
   final AuthService _authService = AuthService();
-  int _selectedIndex = 0;
+  static int _selectedIndex = 0;
 
   // Filtering
   String _selectedStackFilter = 'All';
   String _selectedRemainStatusFilter = 'All';
+  String _selectedMarkFilter = 'All'; // New Mark Filter
+  String _searchQuery = ''; // New Search Query
+  String _selectedSortOption = 'Name A-Z';
+  final List<String> _sortOptions = [
+    'Name A-Z',
+    'Name Z-A',
+    'Marks High-Low',
+    'Marks Low-High',
+  ];
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   // Report Specific Filtering
   String _reportStackFilter = 'All';
   String _reportRemainStatusFilter = 'All';
-  bool _reportIncludeUnmarked = false;
+  String _reportOnboardingStatusFilter = 'All'; // New
+  String _reportEvaluationStatusFilter = 'All'; // New (Replaces boolean)
+  String _reportSearchQuery = '';
+  String _reportSortOption = 'Name A-Z';
+  final TextEditingController _reportSearchController = TextEditingController();
+  final TextEditingController _reportMinMarkController =
+      TextEditingController();
+  final TextEditingController _reportMinAptitudeController =
+      TextEditingController();
+  final TextEditingController _reportMinGDController = TextEditingController();
+  final TextEditingController _reportMinHRController = TextEditingController();
 
   final List<String> _stackOptions = [
     'UI/UX',
@@ -48,64 +81,177 @@ class _DashboardState extends State<Dashboard> {
       final students = await _dataService.getStudents().first;
       final marksMap = await _dataService.getAllMarksStream().first;
 
-      List<String> rows = [
-        "Name,Email,Stack,Remain Status,Aptitude,Aptitude Feedback,GD,GD Feedback,HR,HR Feedback",
+      List<List<dynamic>> rows = [
+        [
+          "Name",
+          "Email",
+          "Stack",
+          "Remain Status",
+          "Aptitude",
+          "Aptitude Feedback",
+          "GD",
+          "GD Feedback",
+          "HR",
+          "HR Feedback",
+          "Total",
+        ],
       ];
 
-      for (var student in students) {
-        // Apply Filters
+      // Filter and Sort Students for Export
+      var filteredStudents = students.where((student) {
+        // Search Filter (Report Specific)
+        if (_reportSearchQuery.isNotEmpty) {
+          if (!student.name.toLowerCase().contains(_reportSearchQuery) &&
+              !student.email.toLowerCase().contains(_reportSearchQuery)) {
+            return false;
+          }
+        }
+
         if (_reportStackFilter != 'All' &&
             student.stack.trim().toLowerCase() !=
                 _reportStackFilter.trim().toLowerCase()) {
-          // Case insensitive check
-          continue;
+          return false;
         }
         if (_reportRemainStatusFilter != 'All' &&
             student.remainStatus != _reportRemainStatusFilter) {
-          continue;
+          return false;
+        }
+
+        // Onboarding Filter
+        if (_reportOnboardingStatusFilter != 'All') {
+          final bool isCompleted = _reportOnboardingStatusFilter == 'Completed';
+          if (student.hasCompletedOnboarding != isCompleted) return false;
         }
 
         final mark = marksMap[student.uid];
-
-        // Check inclusion criteria
         bool hasMarks =
             mark != null && (mark.aptitude > 0 || mark.gd > 0 || mark.hr > 0);
 
-        if (_reportIncludeUnmarked || hasMarks) {
-          final row = [
-            student.name,
-            student.email,
-            student.stack,
-            student.remainStatus,
-            mark?.aptitude ?? 'N/A',
-            (mark?.aptitudeFeedback ?? '').replaceAll(',', ' '),
-            mark?.gd ?? 'N/A',
-            (mark?.gdFeedback ?? '').replaceAll(',', ' '),
-            mark?.hr ?? 'N/A',
-            (mark?.hrFeedback ?? '').replaceAll(',', ' '),
-          ].join(',');
-          rows.add(row);
+        // Evaluation Filter
+        if (_reportEvaluationStatusFilter != 'All') {
+          bool isFullyEvaluated =
+              mark != null && mark.aptitude > 0 && mark.gd > 0 && mark.hr > 0;
+
+          if (_reportEvaluationStatusFilter == 'Fully Evaluated') {
+            if (!isFullyEvaluated) return false;
+          } else if (_reportEvaluationStatusFilter == 'Partially Evaluated') {
+            if (!hasMarks || isFullyEvaluated) return false;
+          } else if (_reportEvaluationStatusFilter == 'Pending Evaluation') {
+            if (hasMarks) return false;
+          } else if (_reportEvaluationStatusFilter == 'Evaluated Only') {
+            if (!hasMarks) return false;
+          }
         }
+
+        // Min Mark Filter (Total)
+        if (_reportMinMarkController.text.isNotEmpty) {
+          final double? minMark = double.tryParse(
+            _reportMinMarkController.text,
+          );
+          if (minMark != null) {
+            final double total = _getTotalMark(mark);
+            if (total < minMark) return false;
+          }
+        }
+
+        // Round Specific Filters
+        if (_reportMinAptitudeController.text.isNotEmpty) {
+          final double? minVal = double.tryParse(
+            _reportMinAptitudeController.text,
+          );
+          if (minVal != null) {
+            if ((mark?.aptitude ?? 0) < minVal) return false;
+          }
+        }
+        if (_reportMinGDController.text.isNotEmpty) {
+          final double? minVal = double.tryParse(_reportMinGDController.text);
+          if (minVal != null) {
+            if ((mark?.gd ?? 0) < minVal) return false;
+          }
+        }
+        if (_reportMinHRController.text.isNotEmpty) {
+          final double? minVal = double.tryParse(_reportMinHRController.text);
+          if (minVal != null) {
+            if ((mark?.hr ?? 0) < minVal) return false;
+          }
+        }
+
+        return true;
+      }).toList();
+
+      // Apply Sorting to Export
+      filteredStudents.sort(
+        (a, b) =>
+            _compareStudents(a, b, marksMap, sortOption: _reportSortOption),
+      );
+
+      for (var student in filteredStudents) {
+        final mark = marksMap[student.uid];
+        rows.add([
+          student.name,
+          student.email,
+          student.stack,
+          student.remainStatus,
+          mark?.aptitude ?? 'N/A',
+          (mark?.aptitudeFeedback ?? '').replaceAll('\n', ' '),
+          mark?.gd ?? 'N/A',
+          (mark?.gdFeedback ?? '').replaceAll('\n', ' '),
+          mark?.hr ?? 'N/A',
+          (mark?.hrFeedback ?? '').replaceAll('\n', ' '),
+          (mark?.aptitude ?? 0) + (mark?.gd ?? 0) + (mark?.hr ?? 0),
+        ]);
       }
 
-      final String csv = rows.join('\n');
-      final bytes = utf8.encode(csv);
-      final blob = html.Blob([bytes]);
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute("download", "candidates_marks.csv")
-        ..click();
-      html.Url.revokeObjectUrl(url);
+      String csv = const ListToCsvConverter().convert(rows);
+
+      if (kIsWeb) {
+        // Web Download
+        final bytes = utf8.encode(csv);
+        final blob = html.Blob([bytes]);
+        final url = html.Url.createObjectUrlFromBlob(blob);
+        final anchor = html.AnchorElement(href: url)
+          ..setAttribute("download", "candidates_marks.csv")
+          ..click();
+        html.Url.revokeObjectUrl(url);
+      } else if (Platform.isWindows) {
+        // Windows Save
+        String? outputFile = await FilePicker.platform.saveFile(
+          dialogTitle: 'Please select an output file:',
+          fileName: 'candidates_marks.csv',
+        );
+
+        if (outputFile != null) {
+          // FilePicker might not add extension on some platforms, verify
+          if (!outputFile.toLowerCase().endsWith('.csv')) {
+            outputFile = '$outputFile.csv';
+          }
+          final file = File(outputFile);
+          await file.writeAsString(csv);
+        } else {
+          // User canceled
+          return;
+        }
+      } else {
+        // Mobile (Android/iOS) - Not primary target but good to have fallback
+        final directory = await getApplicationDocumentsDirectory();
+        final file = File('${directory.path}/candidates_marks.csv');
+        await file.writeAsString(csv);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Saved to ${file.path}")));
+        return;
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("CSV Downloaded"),
+            content: Text("CSV Export Successful"),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
+      debugPrint("Export Error: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -115,6 +261,35 @@ class _DashboardState extends State<Dashboard> {
         );
       }
     }
+  }
+
+  int _compareStudents(
+    StudentModel a,
+    StudentModel b,
+    Map<String, MarkModel> marksMap, {
+    String? sortOption,
+  }) {
+    final option = sortOption ?? _selectedSortOption;
+    switch (option) {
+      case 'Name Z-A':
+        return b.name.toLowerCase().compareTo(a.name.toLowerCase());
+      case 'Marks High-Low':
+        final markA = _getTotalMark(marksMap[a.uid]);
+        final markB = _getTotalMark(marksMap[b.uid]);
+        return markB.compareTo(markA);
+      case 'Marks Low-High':
+        final markA = _getTotalMark(marksMap[a.uid]);
+        final markB = _getTotalMark(marksMap[b.uid]);
+        return markA.compareTo(markB);
+      case 'Name A-Z':
+      default:
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    }
+  }
+
+  double _getTotalMark(MarkModel? mark) {
+    if (mark == null) return 0;
+    return mark.aptitude + mark.gd + mark.hr;
   }
 
   @override
@@ -299,27 +474,34 @@ class _DashboardState extends State<Dashboard> {
   Widget _buildDrawer(ThemeData theme) {
     return Drawer(
       backgroundColor: AppTheme.bentoBg,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView(
-          children: [
-            const SizedBox(height: 20),
-            Image.asset('assets/softlogo.png', height: 100),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              Image.asset(
+                'assets/softlogo.png',
+                height: 80,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 24),
 
-            _navItem(0, Icons.dashboard, "Overview", theme),
-            const SizedBox(height: 12),
-            _navItem(1, Icons.people, "Candidates", theme),
-            const SizedBox(height: 12),
-            _navItem(2, Icons.work, "Interviewers", theme),
-            const SizedBox(height: 12),
-            _navItem(3, Icons.campaign, "Broadcast", theme),
-            const SizedBox(height: 12),
-            _navItem(4, Icons.publish, "Publish Result", theme),
-            const SizedBox(height: 12),
-            _navItem(5, Icons.download_rounded, "Reports", theme),
-            const Spacer(),
-            const SizedBox(height: 12),
-          ],
+              _navItem(0, Icons.dashboard, "Overview", theme),
+              const SizedBox(height: 12),
+              _navItem(1, Icons.people, "Candidates", theme),
+              const SizedBox(height: 12),
+              _navItem(2, Icons.work, "Interviewers", theme),
+              const SizedBox(height: 12),
+              _navItem(3, Icons.campaign, "Broadcast", theme),
+              const SizedBox(height: 12),
+              _navItem(4, Icons.publish, "Publish Result", theme),
+              const SizedBox(height: 12),
+              _navItem(5, Icons.download_rounded, "Reports", theme),
+              const Spacer(),
+              const SizedBox(height: 12),
+            ],
+          ),
         ),
       ),
     );
@@ -330,8 +512,8 @@ class _DashboardState extends State<Dashboard> {
     return InkWell(
       onTap: () {
         setState(() => _selectedIndex = index);
-        if (Scaffold.of(context).hasDrawer &&
-            Scaffold.of(context).isDrawerOpen) {
+        // On mobile, close drawer after selection
+        if (MediaQuery.of(context).size.width <= 800) {
           Navigator.pop(context);
         }
       },
@@ -368,104 +550,191 @@ class _DashboardState extends State<Dashboard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Filters
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _buildFilterChip(
-                  "Stack",
-                  _selectedStackFilter,
-                  ['All', ..._stackOptions],
-                  (val) => setState(() => _selectedStackFilter = val),
-                ),
-                const SizedBox(width: 12),
-                _buildFilterChip(
-                  "Status",
-                  _selectedRemainStatusFilter,
-                  ['All', ..._remainStatusOptions],
-                  (val) => setState(() => _selectedRemainStatusFilter = val),
-                ),
-              ],
+        // Filters
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSearchBar(),
+            const SizedBox(height: 10),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: double.infinity),
+              child: Wrap(
+                spacing: 3,
+                runSpacing: 3,
+                children: [
+                  _buildFilterChip(
+                    "Stack",
+                    _selectedStackFilter,
+                    ['All', ..._stackOptions],
+                    (val) => setState(() => _selectedStackFilter = val),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildFilterChip(
+                    "Status",
+                    _selectedRemainStatusFilter,
+                    ['All', ..._remainStatusOptions],
+                    (val) => setState(() => _selectedRemainStatusFilter = val),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildFilterChip(
+                    "Marks",
+                    _selectedMarkFilter,
+                    ['All', 'Marked', 'Unmarked'],
+                    (val) => setState(() => _selectedMarkFilter = val),
+                  ),
+                  const SizedBox(width: 12),
+                  // Sorting Chip
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.sort, size: 16),
+                        const SizedBox(width: 8),
+                        DropdownButton<String>(
+                          value: _selectedSortOption,
+                          underline: const SizedBox(),
+                          isDense: true,
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 13,
+                          ),
+                          items: _sortOptions.map((e) {
+                            return DropdownMenuItem(value: e, child: Text(e));
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null)
+                              setState(() => _selectedSortOption = val);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 15),
         // Grid of Bento Stats
-        StreamBuilder<List<StudentModel>>(
-          stream: _dataService.getStudents(),
-          builder: (context, snapshot) {
-            final allStudents = snapshot.data ?? [];
-            final filtered = allStudents.where((s) {
-              if (_selectedStackFilter != 'All' &&
-                  s.stack.trim().toLowerCase() !=
-                      _selectedStackFilter.trim().toLowerCase())
-                return false;
-              if (_selectedRemainStatusFilter != 'All' &&
-                  s.remainStatus != _selectedRemainStatusFilter)
-                return false;
-              return true;
-            }).toList();
-            int total = filtered.length;
+        StreamBuilder<Map<String, MarkModel>>(
+          stream: _dataService.getAllMarksStream(),
+          builder: (context, markSnapshot) {
+            final marksMap = markSnapshot.data ?? {};
 
-            return LayoutBuilder(
-              builder: (context, constraints) {
-                // If constrained width is less than 500, stack them.
-                bool isNarrow = constraints.maxWidth < 500;
+            return StreamBuilder<List<StudentModel>>(
+              stream: _dataService.getStudents(),
+              builder: (context, snapshot) {
+                final allStudents = snapshot.data ?? [];
+                final filtered = allStudents.where((s) {
+                  if (_selectedStackFilter != 'All' &&
+                      s.stack.trim().toLowerCase() !=
+                          _selectedStackFilter.trim().toLowerCase()) {
+                    return false;
+                  }
+                  if (_selectedRemainStatusFilter != 'All' &&
+                      s.remainStatus != _selectedRemainStatusFilter) {
+                    return false;
+                  }
+                  return true;
+                }).toList();
+                int total = filtered.length;
 
-                List<Widget> cards = [
-                  if (isNarrow) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: _bentoStatCard(
-                        "Candidates",
-                        "$total",
-                        AppTheme.bentoJacket,
-                        Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: _bentoStatCard(
-                        "Sessions",
-                        "Active",
-                        AppTheme.bentoSurface,
-                        Colors.black87,
-                      ),
-                    ),
-                  ] else ...[
-                    Expanded(
-                      child: _bentoStatCard(
-                        "Candidates",
-                        "$total",
-                        AppTheme.bentoJacket,
-                        Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _bentoStatCard(
-                        "Sessions",
-                        "Active",
-                        AppTheme.bentoSurface,
-                        Colors.black87,
-                      ),
-                    ),
-                  ],
-                ];
+                // Calculate marked count based on filtered students
+                int markedCount = filtered.where((s) {
+                  final m = marksMap[s.uid];
+                  return m != null && (m.aptitude > 0 || m.gd > 0 || m.hr > 0);
+                }).length;
 
-                if (isNarrow) {
-                  return Column(children: cards);
-                } else {
-                  return Row(children: cards);
-                }
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    // If constrained width is less than 500, stack them.
+                    bool isNarrow = constraints.maxWidth < 600;
+
+                    List<Widget> cards = [
+                      if (isNarrow) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _bentoStatCard(
+                                "Candidates",
+                                "$total",
+                                AppTheme.bentoJacket,
+                                Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _bentoStatCard(
+                                "Marked",
+                                "$markedCount",
+                                AppTheme.bentoAccent,
+                                Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: _bentoStatCard(
+                            "Sessions",
+                            "Active",
+                            AppTheme.bentoSurface,
+                            Colors.black87,
+                          ),
+                        ),
+                      ] else ...[
+                        Expanded(
+                          child: _bentoStatCard(
+                            "Candidates",
+                            "$total",
+                            AppTheme.bentoJacket,
+                            Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _bentoStatCard(
+                            "Marked",
+                            "$markedCount",
+                            AppTheme.bentoAccent,
+                            Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _bentoStatCard(
+                            "Sessions",
+                            "Active",
+                            AppTheme.bentoSurface,
+                            Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ];
+
+                    if (isNarrow) {
+                      return Column(children: cards);
+                    } else {
+                      return Row(children: cards);
+                    }
+                  },
+                );
               },
             );
           },
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 15),
 
         Container(
           width: double.infinity,
@@ -497,28 +766,46 @@ class _DashboardState extends State<Dashboard> {
 
                       // Filter: Only show students who have marks AND match selected filters
                       final markedStudents = allStudents.where((s) {
-                        // 1. Must have marks
                         final m = marksMap[s.uid];
                         bool hasMarks =
                             m != null &&
                             (m.aptitude > 0 || m.gd > 0 || m.hr > 0);
+
+                        // 1. Must always have marks for this specific list (as it's "Assessment Progress")
                         if (!hasMarks) return false;
 
-                        // 2. Must match Stack Filter
+                        // 2. Search Query (Name or Email)
+                        if (_searchQuery.isNotEmpty) {
+                          if (!s.name.toLowerCase().contains(_searchQuery) &&
+                              !s.email.toLowerCase().contains(_searchQuery)) {
+                            return false;
+                          }
+                        }
+
+                        // 3. Must match Stack Filter
                         if (_selectedStackFilter != 'All' &&
                             s.stack.trim().toLowerCase() !=
                                 _selectedStackFilter.trim().toLowerCase()) {
                           return false;
                         }
 
-                        // 3. Must match Status Filter
+                        // 4. Must match Status Filter
                         if (_selectedRemainStatusFilter != 'All' &&
                             s.remainStatus != _selectedRemainStatusFilter) {
                           return false;
                         }
 
+                        // 5. Mark Filter (Already checked hasMarks, but respecting the UI Toggle)
+                        if (_selectedMarkFilter == 'Unmarked')
+                          return false; // This list only shows marked
+
                         return true;
                       }).toList();
+
+                      // Apply Sorting
+                      markedStudents.sort(
+                        (a, b) => _compareStudents(a, b, marksMap),
+                      );
 
                       if (markedStudents.isEmpty) {
                         return Text("No marked students yet.");
@@ -600,11 +887,20 @@ class _DashboardState extends State<Dashboard> {
                                             _miniBadge(
                                               "APT",
                                               marks?.aptitude ?? 0,
+                                              max: 25,
                                             ),
                                             const SizedBox(width: 4),
-                                            _miniBadge("GD", marks?.gd ?? 0),
+                                            _miniBadge(
+                                              "GD",
+                                              marks?.gd ?? 0,
+                                              max: 25,
+                                            ),
                                             const SizedBox(width: 4),
-                                            _miniBadge("HR", marks?.hr ?? 0),
+                                            _miniBadge(
+                                              "HR",
+                                              marks?.hr ?? 0,
+                                              max: 25,
+                                            ),
                                           ],
                                         ),
                                       ],
@@ -651,8 +947,8 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  Widget _miniBadge(String label, double score) {
-    final color = score > 0 ? _getMarkColor(score) : Colors.grey[300];
+  Widget _miniBadge(String label, double score, {double max = 100}) {
+    final color = score > 0 ? _getMarkColor(score, max: max) : Colors.grey[300];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -670,11 +966,12 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  Color _getMarkColor(double score) {
-    if (score >= 90) return Colors.green;
-    if (score >= 70) return Colors.lightGreen;
-    if (score >= 50) return Colors.orange;
-    if (score >= 40) return Colors.amber;
+  Color _getMarkColor(double score, {double max = 100}) {
+    final percentage = score / max;
+    if (percentage >= 0.9) return Colors.green;
+    if (percentage >= 0.7) return Colors.lightGreen;
+    if (percentage >= 0.5) return Colors.orange;
+    if (percentage >= 0.4) return Colors.amber;
     return Colors.redAccent;
   }
 
@@ -687,6 +984,7 @@ class _DashboardState extends State<Dashboard> {
             // Header in a bento tile? Or just text. Let's do a bento tile header.
             Expanded(
               child: Container(
+                width: double.infinity,
                 padding: EdgeInsets.all(
                   MediaQuery.of(context).size.width < 600 ? 16 : 24,
                 ),
@@ -737,161 +1035,250 @@ class _DashboardState extends State<Dashboard> {
             ],
           ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 15),
 
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                if (role == 'interviewee') ...[
-                  _buildFilterChip(
-                    "Stack",
-                    _selectedStackFilter,
-                    ['All', ..._stackOptions],
-                    (val) => setState(() => _selectedStackFilter = val),
-                  ),
-                  const SizedBox(width: 12),
-                  _buildFilterChip(
-                    "Status",
-                    _selectedRemainStatusFilter,
-                    ['All', ..._remainStatusOptions],
-                    (val) => setState(() => _selectedRemainStatusFilter = val),
-                  ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSearchBar(),
+            const SizedBox(height: 15),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: double.infinity),
+              child: Wrap(
+                spacing: 3,
+                runSpacing: 3,
+                children: [
+                  if (role == 'interviewee') ...[
+                    _buildFilterChip(
+                      "Stack",
+                      _selectedStackFilter,
+                      ['All', ..._stackOptions],
+                      (val) => setState(() => _selectedStackFilter = val),
+                    ),
+                    const SizedBox(width: 5),
+                    _buildFilterChip(
+                      "Status",
+                      _selectedRemainStatusFilter,
+                      ['All', ..._remainStatusOptions],
+                      (val) =>
+                          setState(() => _selectedRemainStatusFilter = val),
+                    ),
+                    const SizedBox(width: 5),
+                    _buildFilterChip(
+                      "Marks",
+                      _selectedMarkFilter,
+                      ['All', 'Marked', 'Unmarked'],
+                      (val) => setState(() => _selectedMarkFilter = val),
+                    ),
+                    const SizedBox(width: 5),
+                    // Sorting Chip
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.sort, size: 16),
+                          const SizedBox(width: 8),
+                          DropdownButton<String>(
+                            value: _selectedSortOption,
+                            underline: const SizedBox(),
+                            isDense: true,
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13,
+                            ),
+                            items: _sortOptions.map((e) {
+                              return DropdownMenuItem(value: e, child: Text(e));
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null)
+                                setState(() => _selectedSortOption = val);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
+          ],
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 15),
         Container(
           padding: const EdgeInsets.all(24),
           decoration: AppTheme.bentoDecoration(
             color: AppTheme.bentoSurface,
             radius: 32,
           ),
-          child: StreamBuilder<List<UserModel>>(
-            stream: _dataService.getUsersByRole(role),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final allUsers = snapshot.data ?? [];
+          child: StreamBuilder<Map<String, MarkModel>>(
+            stream: _dataService.getAllMarksStream(), // Need marks for filter
+            builder: (context, markSnap) {
+              final marksMap = markSnap.data ?? {};
 
-              // Apply Filters
-              final users = allUsers.where((user) {
-                if (user is! StudentModel) return true;
-                if (_selectedStackFilter != 'All' &&
-                    user.stack.trim().toLowerCase() !=
-                        _selectedStackFilter.trim().toLowerCase()) {
-                  // Case insensitive check
-                  return false;
-                }
-                if (_selectedRemainStatusFilter != 'All' &&
-                    user.remainStatus != _selectedRemainStatusFilter) {
-                  return false;
-                }
-                return true;
-              }).toList();
+              return StreamBuilder<List<UserModel>>(
+                stream: _dataService.getUsersByRole(role),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  final allUsers = snapshot.data ?? [];
 
-              return ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: users.length,
-                itemBuilder: (context, index) {
-                  final user = users[index];
+                  // Apply Filters
+                  final users = allUsers.where((user) {
+                    // Search Filter
+                    if (_searchQuery.isNotEmpty) {
+                      if (!user.name.toLowerCase().contains(_searchQuery) &&
+                          !user.email.toLowerCase().contains(_searchQuery)) {
+                        return false;
+                      }
+                    }
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child:
-                        InkWell(
-                              onTap: user is StudentModel
-                                  ? () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              StudentProfilePage(student: user),
+                    if (user is! StudentModel) return true;
+                    if (_selectedStackFilter != 'All' &&
+                        user.stack.trim().toLowerCase() !=
+                            _selectedStackFilter.trim().toLowerCase()) {
+                      // Case insensitive check
+                      return false;
+                    }
+                    if (_selectedRemainStatusFilter != 'All' &&
+                        user.remainStatus != _selectedRemainStatusFilter) {
+                      return false;
+                    }
+                    // Mark Filter
+                    if (_selectedMarkFilter != 'All') {
+                      final m = marksMap[user.uid];
+                      bool hasMarks =
+                          m != null && (m.aptitude > 0 || m.gd > 0 || m.hr > 0);
+                      if (_selectedMarkFilter == 'Marked' && !hasMarks)
+                        return false;
+                      if (_selectedMarkFilter == 'Unmarked' && hasMarks)
+                        return false;
+                    }
+
+                    return true;
+                  }).toList();
+
+                  // Apply Sorting
+                  users.sort((a, b) {
+                    if (a is StudentModel && b is StudentModel) {
+                      return _compareStudents(a, b, marksMap);
+                    }
+                    return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+                  });
+
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: users.length,
+                    itemBuilder: (context, index) {
+                      final user = users[index];
+                      // ... rest of the item builder
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child:
+                            InkWell(
+                                  onTap: user is StudentModel
+                                      ? () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  StudentProfilePage(
+                                                    student: user,
+                                                  ),
+                                            ),
+                                          );
+                                        }
+                                      : null,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: AppTheme.bentoDecoration(
+                                      color: AppTheme.softWhite,
+                                      radius: 20,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        CircleAvatar(
+                                          backgroundColor: AppTheme.bentoBg,
+                                          child: Icon(
+                                            user is StudentModel
+                                                ? Icons.person
+                                                : Icons.badge,
+                                            color: Colors.grey[600],
+                                          ),
                                         ),
-                                      );
-                                    }
-                                  : null,
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: AppTheme.bentoDecoration(
-                                  color: AppTheme.softWhite,
-                                  radius: 20,
-                                ),
-                                child: Row(
-                                  children: [
-                                    CircleAvatar(
-                                      backgroundColor: AppTheme.bentoBg,
-                                      child: Icon(
-                                        user is StudentModel
-                                            ? Icons.person
-                                            : Icons.badge,
-                                        color: Colors.grey[600],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 16),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            user.name.isNotEmpty
-                                                ? user.name
-                                                : (user is StudentModel
-                                                      ? "Candidate"
-                                                      : user.role.name[0]
-                                                                .toUpperCase() +
-                                                            user.role.name
-                                                                .substring(1)),
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
+                                        const SizedBox(width: 16),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                user.name.isNotEmpty
+                                                    ? user.name
+                                                    : (user is StudentModel
+                                                          ? "Candidate"
+                                                          : user.role.name[0]
+                                                                    .toUpperCase() +
+                                                                user.role.name
+                                                                    .substring(
+                                                                      1,
+                                                                    )),
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              Text(
+                                                user.email,
+                                                style: const TextStyle(
+                                                  color: Colors.grey,
+                                                  fontSize: 12,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
                                           ),
-                                          Text(
-                                            user.email,
-                                            style: const TextStyle(
-                                              color: Colors.grey,
-                                              fontSize: 12,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
+                                        ),
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.edit_outlined,
+                                            color: Colors.blue[300],
+                                            size: 20,
                                           ),
-                                        ],
-                                      ),
+                                          onPressed: () =>
+                                              _showEditUserDialog(user),
+                                        ),
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.delete_outline,
+                                            color: Colors.red[300],
+                                            size: 20,
+                                          ),
+                                          onPressed: () =>
+                                              _showDeleteConfirmation(user.uid),
+                                        ),
+                                      ],
                                     ),
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.edit_outlined,
-                                        color: Colors.blue[300],
-                                        size: 20,
-                                      ),
-                                      onPressed: () =>
-                                          _showEditUserDialog(user),
-                                    ),
-                                    IconButton(
-                                      icon: Icon(
-                                        Icons.delete_outline,
-                                        color: Colors.red[300],
-                                        size: 20,
-                                      ),
-                                      onPressed: () =>
-                                          _showDeleteConfirmation(user.uid),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                            .animate()
-                            .fade(delay: (index * 50).ms)
-                            .slideY(begin: 0.1, end: 0),
+                                  ),
+                                )
+                                .animate()
+                                .fade(delay: (index * 50).ms)
+                                .slideY(begin: 0.1, end: 0),
+                      );
+                    },
                   );
                 },
               );
@@ -1355,6 +1742,7 @@ class _DashboardState extends State<Dashboard> {
   Widget _buildBroadcastScreen(ThemeData theme) {
     final titleController = TextEditingController();
     final messageController = TextEditingController();
+    final minMarksController = TextEditingController(); // New
     String targetRole = 'all';
     final isMobile = MediaQuery.of(context).size.width < 600;
 
@@ -1453,7 +1841,7 @@ class _DashboardState extends State<Dashboard> {
                       width: isMobile ? 140 : 160,
                       padding: const EdgeInsets.all(12),
                       decoration: AppTheme.bentoDecoration(
-                        color: (p['color'] as Color).withValues(alpha: 0.1),
+                        color: (p['color'] as Color).withOpacity(0.1),
                         radius: 20,
                       ),
                       child: Column(
@@ -1519,33 +1907,54 @@ class _DashboardState extends State<Dashboard> {
                 const SizedBox(height: 16),
                 StatefulBuilder(
                   builder: (context, setInnerState) {
-                    return DropdownButtonFormField<String>(
-                      initialValue: targetRole,
-                      decoration: InputDecoration(
-                        labelText: "Target Users",
-                        filled: true,
-                        fillColor: AppTheme.bentoBg,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
+                    return Column(
+                      children: [
+                        DropdownButtonFormField<String>(
+                          initialValue: targetRole,
+                          decoration: InputDecoration(
+                            labelText: "Target Users",
+                            filled: true,
+                            fillColor: AppTheme.bentoBg,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'all',
+                              child: Text("All Users"),
+                            ),
+                            DropdownMenuItem(
+                              value: 'interviewee',
+                              child: Text("All Students"),
+                            ),
+                            DropdownMenuItem(
+                              value: 'interviewer',
+                              child: Text("All Interviewers"),
+                            ),
+                          ],
+                          onChanged: (val) =>
+                              setInnerState(() => targetRole = val!),
                         ),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'all',
-                          child: Text("All Users"),
-                        ),
-                        DropdownMenuItem(
-                          value: 'interviewee',
-                          child: Text("All Students"),
-                        ),
-                        DropdownMenuItem(
-                          value: 'interviewer',
-                          child: Text("All Interviewers"),
-                        ),
+                        const SizedBox(height: 16),
+                        // Min Marks Filter
+                        if (targetRole == 'interviewee' || targetRole == 'all')
+                          TextField(
+                            controller: minMarksController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              labelText: "Min Marks Filter (Optional)",
+                              hintText: "e.g. 10, 20, 30...",
+                              filled: true,
+                              fillColor: AppTheme.bentoBg,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
                       ],
-                      onChanged: (val) =>
-                          setInnerState(() => targetRole = val!),
                     );
                   },
                 ),
@@ -1572,10 +1981,12 @@ class _DashboardState extends State<Dashboard> {
                           message: messageController.text,
                           timestamp: DateTime.now(),
                           targetRole: targetRole,
+                          minMarks: double.tryParse(minMarksController.text),
                         ),
                       );
                       titleController.clear();
                       messageController.clear();
+                      minMarksController.clear();
                       if (!mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("Broadcast Sent!")),
@@ -1650,7 +2061,7 @@ class _DashboardState extends State<Dashboard> {
                             vertical: 16,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.1),
+                            color: Colors.white.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(24),
                           ),
                           child: Row(
@@ -1759,6 +2170,34 @@ class _DashboardState extends State<Dashboard> {
     }
   }
 
+  Widget _buildSearchBar() {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: double.infinity),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: "Search by Name or Email...",
+          prefixIcon: const Icon(Icons.search),
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(24),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 16,
+          ),
+        ),
+        onChanged: (value) {
+          setState(() {
+            _searchQuery = value.trim().toLowerCase();
+          });
+        },
+      ),
+    );
+  }
+
   Widget _buildFilterChip(
     String label,
     String selectedValue,
@@ -1770,7 +2209,7 @@ class _DashboardState extends State<Dashboard> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1810,6 +2249,7 @@ class _DashboardState extends State<Dashboard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
+          width: double.infinity,
           padding: EdgeInsets.all(isMobile ? 16 : 24),
           decoration: AppTheme.bentoDecoration(
             color: AppTheme.bentoJacket,
@@ -1829,7 +2269,7 @@ class _DashboardState extends State<Dashboard> {
               const SizedBox(height: 8),
               Text(
                 "Generate and download CSV reports based on student performance.",
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
+                style: TextStyle(color: Colors.white.withOpacity(0.7)),
               ),
             ],
           ),
@@ -1849,35 +2289,202 @@ class _DashboardState extends State<Dashboard> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _buildFilterChip(
-                      "Stack",
-                      _reportStackFilter,
-                      ['All', ..._stackOptions],
-                      (val) => setState(() => _reportStackFilter = val),
-                    ),
-                    const SizedBox(width: 12),
-                    _buildFilterChip(
-                      "Status",
-                      _reportRemainStatusFilter,
-                      ['All', ..._remainStatusOptions],
-                      (val) => setState(() => _reportRemainStatusFilter = val),
-                    ),
-                  ],
+              // Search Bar for Reports
+              TextField(
+                controller: _reportSearchController,
+                decoration: InputDecoration(
+                  hintText: "Search by Name or Email...",
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                 ),
+                onChanged: (value) {
+                  setState(() {
+                    _reportSearchQuery = value.trim().toLowerCase();
+                  });
+                },
               ),
               const SizedBox(height: 16),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text("Include Unmarked Students"),
-                value: _reportIncludeUnmarked,
-                onChanged: (val) =>
-                    setState(() => _reportIncludeUnmarked = val ?? false),
-                controlAffinity: ListTileControlAffinity.leading,
+              Wrap(
+                spacing: 3,
+                runSpacing: 3,
+                children: [
+                  _buildFilterChip(
+                    "Stack",
+                    _reportStackFilter,
+                    ['All', ..._stackOptions],
+                    (val) => setState(() => _reportStackFilter = val),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildFilterChip(
+                    "Status",
+                    _reportRemainStatusFilter,
+                    ['All', ..._remainStatusOptions],
+                    (val) => setState(() => _reportRemainStatusFilter = val),
+                  ),
+                  const SizedBox(width: 12),
+                  // Report Sorting
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.sort, size: 16),
+                        const SizedBox(width: 8),
+                        DropdownButton<String>(
+                          value: _reportSortOption,
+                          underline: const SizedBox(),
+                          isDense: true,
+                          style: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 13,
+                          ),
+                          items: _sortOptions.map((e) {
+                            return DropdownMenuItem(value: e, child: Text(e));
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null)
+                              setState(() => _reportSortOption = val);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildFilterChip(
+                    "Onboarding",
+                    _reportOnboardingStatusFilter,
+                    ['All', 'Completed', 'Pending'],
+                    (val) =>
+                        setState(() => _reportOnboardingStatusFilter = val),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildFilterChip(
+                    "Evaluation",
+                    _reportEvaluationStatusFilter,
+                    [
+                      'All',
+                      'Evaluated Only',
+                      'Fully Evaluated',
+                      'Partially Evaluated',
+                      'Pending Evaluation',
+                    ],
+                    (val) =>
+                        setState(() => _reportEvaluationStatusFilter = val),
+                  ),
+                ],
               ),
+              const SizedBox(height: 16),
+              // Mark Filters
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: 180,
+                    child: TextField(
+                      controller: _reportMinMarkController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: "Min Total",
+                        prefixIcon: const Icon(Icons.functions),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 150,
+                    child: TextField(
+                      controller: _reportMinAptitudeController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: "Min Aptitude",
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 150,
+                    child: TextField(
+                      controller: _reportMinGDController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: "Min GD",
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 150,
+                    child: TextField(
+                      controller: _reportMinHRController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: "Min HR",
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,

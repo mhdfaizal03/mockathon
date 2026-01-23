@@ -95,161 +95,180 @@ class _HomePageState extends State<HomePage> {
                 ),
                 SizedBox(height: 10),
                 Expanded(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        maxWidth: double.infinity,
-                      ),
-                      child: CustomScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        slivers: [
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Filter Chips
-                                  // Stack Filters
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          left: 8,
-                                          bottom: 8,
-                                        ),
-                                        child: Text(
-                                          "Filter by Stack",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.grey[800],
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ),
-                                      SingleChildScrollView(
-                                        scrollDirection: Axis.horizontal,
-                                        clipBehavior: Clip.none,
-                                        child: Row(
-                                          children: [
-                                            ...['All', ..._stackOptions].map(
-                                              (stack) => Padding(
-                                                padding: const EdgeInsets.only(
-                                                  right: 8,
-                                                ),
-                                                child: _buildFilterPill(
-                                                  stack,
-                                                  _selectedStackFilter == stack,
-                                                  () => setState(
-                                                    () => _selectedStackFilter =
-                                                        stack,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 20),
-                                  // Status Filters
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Padding(
-                                        padding: const EdgeInsets.only(
-                                          left: 8,
-                                          bottom: 8,
-                                        ),
-                                        child: Text(
-                                          "Filter by Status",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.grey[800],
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ),
-                                      SingleChildScrollView(
-                                        scrollDirection: Axis.horizontal,
-                                        clipBehavior: Clip.none,
-                                        child: Row(
-                                          children: [
-                                            ...[
-                                              'All',
-                                              ..._remainStatusOptions,
-                                            ].map(
-                                              (status) => Padding(
-                                                padding: const EdgeInsets.only(
-                                                  right: 8,
-                                                ),
-                                                child: _buildFilterPill(
-                                                  status,
-                                                  _selectedRemainStatusFilter ==
-                                                      status,
-                                                  () => setState(
-                                                    () =>
-                                                        _selectedRemainStatusFilter =
-                                                            status,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 16),
-                                  const SizedBox(height: 12),
-                                ],
-                              ),
-                            ),
+                  child: StreamBuilder<List<StudentModel>>(
+                    stream: _dataService.getStudents(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      final students = snapshot.data!.where((s) {
+                        final matchesSearch =
+                            s.name.toLowerCase().contains(_searchQuery) ||
+                            s.stack.toLowerCase().contains(_searchQuery);
+
+                        if (!matchesSearch) return false;
+                        if (_selectedStackFilter != 'All' &&
+                            s.stack != _selectedStackFilter) {
+                          return false;
+                        }
+                        if (_selectedRemainStatusFilter != 'All' &&
+                            s.remainStatus != _selectedRemainStatusFilter) {
+                          return false;
+                        }
+                        return true;
+                      }).toList();
+
+                      return Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            maxWidth: double.infinity,
                           ),
-
-                          // Student List/Grid Stream
-                          StreamBuilder<List<StudentModel>>(
-                            stream: _dataService.getStudents(),
-                            builder: (context, snapshot) {
-                              if (!snapshot.hasData) {
-                                return const SliverToBoxAdapter(
-                                  child: Center(
-                                    child: CircularProgressIndicator(),
+                          child: CustomScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            slivers: [
+                              SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
                                   ),
-                                );
-                              }
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      // Filter Chips
+                                      // Stack Filters
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              left: 8,
+                                              bottom: 8,
+                                            ),
+                                            child: Text(
+                                              "Filter by Stack",
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.grey[800],
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ),
+                                          SingleChildScrollView(
+                                            scrollDirection: Axis.horizontal,
+                                            clipBehavior: Clip.none,
+                                            child: Row(
+                                              children: [
+                                                ...[
+                                                  'All',
+                                                  ..._stackOptions,
+                                                ].map(
+                                                  (stack) => Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                          right: 8,
+                                                        ),
+                                                    child: _buildFilterPill(
+                                                      stack,
+                                                      _selectedStackFilter ==
+                                                          stack,
+                                                      () => setState(
+                                                        () =>
+                                                            _selectedStackFilter =
+                                                                stack,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 20),
+                                      // Status Filters
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                              left: 8,
+                                              bottom: 8,
+                                            ),
+                                            child: Text(
+                                              "Filter by Status",
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.grey[800],
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ),
+                                          SingleChildScrollView(
+                                            scrollDirection: Axis.horizontal,
+                                            clipBehavior: Clip.none,
+                                            child: Row(
+                                              children: [
+                                                ...[
+                                                  'All',
+                                                  ..._remainStatusOptions,
+                                                ].map(
+                                                  (status) => Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                          right: 8,
+                                                        ),
+                                                    child: _buildFilterPill(
+                                                      status,
+                                                      _selectedRemainStatusFilter ==
+                                                          status,
+                                                      () => setState(
+                                                        () =>
+                                                            _selectedRemainStatusFilter =
+                                                                status,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Container(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppTheme.bentoJacket
+                                              .withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          "${students.length} Candidates Found",
+                                          style: TextStyle(
+                                            color: AppTheme.bentoJacket,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                    ],
+                                  ),
+                                ),
+                              ),
 
-                              final students = snapshot.data!.where((s) {
-                                final matchesSearch =
-                                    s.name.toLowerCase().contains(
-                                      _searchQuery,
-                                    ) ||
-                                    s.stack.toLowerCase().contains(
-                                      _searchQuery,
-                                    );
-
-                                if (!matchesSearch) return false;
-                                if (_selectedStackFilter != 'All' &&
-                                    s.stack != _selectedStackFilter) {
-                                  return false;
-                                }
-                                if (_selectedRemainStatusFilter != 'All' &&
-                                    s.remainStatus !=
-                                        _selectedRemainStatusFilter) {
-                                  return false;
-                                }
-                                return true;
-                              }).toList();
-
-                              if (students.isEmpty) {
-                                return const SliverToBoxAdapter(
+                              if (students.isEmpty)
+                                const SliverToBoxAdapter(
                                   child: Padding(
                                     padding: EdgeInsets.only(top: 40),
                                     child: Center(
@@ -259,13 +278,9 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                     ),
                                   ),
-                                );
-                              }
-
-                              bool isMobile = constraints.maxWidth < 600;
-
-                              if (isMobile) {
-                                return SliverPadding(
+                                )
+                              else if (constraints.maxWidth < 600)
+                                SliverPadding(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 16,
                                   ),
@@ -278,20 +293,16 @@ class _HomePageState extends State<HomePage> {
                                         padding: const EdgeInsets.only(
                                           bottom: 8,
                                         ),
-                                        child:
-                                            _buildBentoStudentListTile(
-                                                  students[index],
-                                                  index,
-                                                )
-                                                .animate()
-                                                .fade(delay: (index * 50).ms)
-                                                .slideX(begin: 0.1, end: 0),
+                                        child: _buildBentoStudentListTile(
+                                          students[index],
+                                          index,
+                                        ),
                                       );
                                     }, childCount: students.length),
                                   ),
-                                );
-                              } else {
-                                return SliverPadding(
+                                )
+                              else
+                                SliverPadding(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 16,
                                   ),
@@ -308,24 +319,21 @@ class _HomePageState extends State<HomePage> {
                                       index,
                                     ) {
                                       return _buildBentoStudentCard(
-                                            students[index],
-                                            index,
-                                          )
-                                          .animate()
-                                          .fade(delay: (index * 100).ms)
-                                          .scale(curve: Curves.easeOutBack);
+                                        students[index],
+                                        index,
+                                      );
                                     }, childCount: students.length),
                                   ),
-                                );
-                              }
-                            },
+                                ),
+
+                              const SliverToBoxAdapter(
+                                child: SizedBox(height: 100),
+                              ),
+                            ],
                           ),
-                          const SliverToBoxAdapter(
-                            child: SizedBox(height: 100),
-                          ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],
@@ -346,7 +354,7 @@ class _HomePageState extends State<HomePage> {
         gradient: AppTheme.primaryGradient,
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryPurple.withValues(alpha: 0.3),
+            color: AppTheme.primaryPurple.withOpacity(0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -385,10 +393,8 @@ class _HomePageState extends State<HomePage> {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.2),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.3),
-                  ),
+                  color: Colors.white.withOpacity(0.2),
+                  border: Border.all(color: Colors.white.withOpacity(0.3)),
                 ),
                 child: const Icon(Icons.logout, color: Colors.white),
               ),
@@ -465,7 +471,7 @@ class _HomePageState extends State<HomePage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: AppTheme.bentoJacket.withValues(alpha: 0.1),
+                  color: AppTheme.bentoJacket.withOpacity(0.1),
                   width: 2,
                 ),
               ),
@@ -504,7 +510,7 @@ class _HomePageState extends State<HomePage> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: AppTheme.bentoJacket.withValues(alpha: 0.05),
+                      color: AppTheme.bentoJacket.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -527,7 +533,7 @@ class _HomePageState extends State<HomePage> {
                 Icon(
                   Icons.arrow_forward_ios_rounded,
                   size: 14,
-                  color: Colors.grey.withValues(alpha: 0.5),
+                  color: Colors.grey.withOpacity(0.5),
                 ),
                 const SizedBox(height: 8),
                 ConstrainedBox(
@@ -535,7 +541,7 @@ class _HomePageState extends State<HomePage> {
                   child: Text(
                     "#${student.randomId}",
                     style: TextStyle(
-                      color: Colors.grey.withValues(alpha: 0.5),
+                      color: Colors.grey.withOpacity(0.5),
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -579,7 +585,7 @@ class _HomePageState extends State<HomePage> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: AppTheme.bentoJacket.withValues(alpha: 0.1),
+                      color: AppTheme.bentoJacket.withOpacity(0.1),
                       width: 2,
                     ),
                   ),
@@ -635,7 +641,7 @@ class _HomePageState extends State<HomePage> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.bentoJacket.withValues(alpha: 0.05),
+                    color: AppTheme.bentoJacket.withOpacity(0.05),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -652,7 +658,7 @@ class _HomePageState extends State<HomePage> {
                 Text(
                   "ID: ${student.randomId}",
                   style: TextStyle(
-                    color: Colors.grey.withValues(alpha: 0.5),
+                    color: Colors.grey.withOpacity(0.5),
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                   ),
@@ -681,12 +687,12 @@ class _HomePageState extends State<HomePage> {
           border: Border.all(
             color: isSelected
                 ? AppTheme.bentoJacket
-                : Colors.grey.withValues(alpha: 0.3),
+                : Colors.grey.withOpacity(0.3),
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppTheme.bentoJacket.withValues(alpha: 0.3),
+                    color: AppTheme.bentoJacket.withOpacity(0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),

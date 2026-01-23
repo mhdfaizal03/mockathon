@@ -153,7 +153,7 @@ class OnboardingScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.bentoJacket.withValues(alpha: 0.1),
+              color: AppTheme.bentoJacket.withOpacity(0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, size: 18, color: AppTheme.bentoJacket),

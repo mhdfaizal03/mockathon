@@ -75,7 +75,7 @@ class StudentProfilePage extends StatelessWidget {
                                 color: Colors.white,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.2),
+                                    color: Colors.black.withOpacity(0.2),
                                     blurRadius: 20,
                                     offset: const Offset(0, 10),
                                   ),
@@ -155,10 +155,10 @@ class StudentProfilePage extends StatelessWidget {
                                 vertical: 12,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.orange.withValues(alpha: 0.1),
+                                color: Colors.orange.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: Colors.orange.withValues(alpha: 0.3),
+                                  color: Colors.orange.withOpacity(0.3),
                                 ),
                               ),
                               child: Row(
@@ -207,6 +207,7 @@ class StudentProfilePage extends StatelessWidget {
                                             marks.aptitude,
                                             Icons.psychology,
                                             Colors.blueAccent,
+                                            max: 25,
                                           ),
                                         ),
                                         SizedBox(
@@ -220,6 +221,7 @@ class StudentProfilePage extends StatelessWidget {
                                             marks.gd,
                                             Icons.groups,
                                             Colors.purpleAccent,
+                                            max: 25,
                                           ),
                                         ),
                                         SizedBox(
@@ -233,6 +235,7 @@ class StudentProfilePage extends StatelessWidget {
                                             marks.hr,
                                             Icons.person_search,
                                             Colors.orangeAccent,
+                                            max: 25,
                                           ),
                                         ),
                                       ];
@@ -332,8 +335,9 @@ class StudentProfilePage extends StatelessWidget {
     String title,
     double score,
     IconData icon,
-    Color accent,
-  ) {
+    Color accent, {
+    double max = 100,
+  }) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 32),
@@ -346,17 +350,17 @@ class StudentProfilePage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.1),
+                  color: accent.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: accent, size: 28),
               ),
               Text(
-                "${score.toInt()}/100",
+                "${score.toInt()}/${max.toInt()}",
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: _getScoreColor(score),
+                  color: _getScoreColor(score, max: max),
                 ),
               ),
             ],
@@ -372,9 +376,9 @@ class StudentProfilePage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           LinearProgressIndicator(
-            value: score / 100,
+            value: score / max,
             backgroundColor: Colors.grey[100],
-            color: _getScoreColor(score),
+            color: _getScoreColor(score, max: max),
             borderRadius: BorderRadius.circular(10),
             minHeight: 8,
           ),
@@ -403,11 +407,12 @@ class StudentProfilePage extends StatelessWidget {
     );
   }
 
-  Color _getScoreColor(double score) {
-    if (score >= 90) return Colors.green;
-    if (score >= 70) return Colors.lightGreen;
-    if (score >= 50) return Colors.orange;
-    if (score >= 40) return Colors.amber;
+  Color _getScoreColor(double score, {double max = 100}) {
+    final percentage = score / max;
+    if (percentage >= 0.9) return Colors.green;
+    if (percentage >= 0.7) return Colors.lightGreen;
+    if (percentage >= 0.5) return Colors.orange;
+    if (percentage >= 0.4) return Colors.amber;
     return Colors.redAccent;
   }
 }

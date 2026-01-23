@@ -1,0 +1,51 @@
+00:00 +0: loading D:/FLUTTER PROJECTS/WORKING/mockathon/test/widget_test.dart
+lib/admin/dashboard.dart:8:8: Error: Dart library 'dart:html' is not available on this platform.
+import 'dart:html' as html;
+       ^
+Context: The unavailable library 'dart:html' is imported through these packages:
+
+    /D:/FLUTTER%20PROJECTS/WORKING/mockathon/test/widget_test.dart => package:mockathon => dart:html
+
+Detailed import paths for (some of) the these imports:
+
+    listener.dart => /D:/FLUTTER%20PROJECTS/WORKING/mockathon/test/widget_test.dart => package:mockathon/authentication/welcome_page.dart => package:mockathon/authentication/login_page.dart => package:mockathon/admin/dashboard.dart => dart:html
+
+lib/admin/dashboard.dart:93:25: Error: Method not found: 'Blob'.
+      final blob = html.Blob([bytes]);
+                        ^^^^
+lib/admin/dashboard.dart:94:24: Error: Undefined name 'Url'.
+      final url = html.Url.createObjectUrlFromBlob(blob);
+                       ^^^
+lib/admin/dashboard.dart:95:27: Error: Method not found: 'AnchorElement'.
+      final anchor = html.AnchorElement(href: url)
+                          ^^^^^^^^^^^^^
+lib/admin/dashboard.dart:98:12: Error: Undefined name 'Url'.
+      html.Url.revokeObjectUrl(url);
+           ^^^
+00:00 +0 -1: loading D:/FLUTTER PROJECTS/WORKING/mockathon/test/widget_test.dart [E]
+  Failed to load "D:/FLUTTER PROJECTS/WORKING/mockathon/test/widget_test.dart":
+  Compilation failed for testPath=D:/FLUTTER PROJECTS/WORKING/mockathon/test/widget_test.dart: lib/admin/dashboard.dart:8:8: Error: Dart library 'dart:html' is not available on this platform.
+  import 'dart:html' as html;
+         ^
+  Context: The unavailable library 'dart:html' is imported through these packages:
+  
+      /D:/FLUTTER%20PROJECTS/WORKING/mockathon/test/widget_test.dart => package:mockathon => dart:html
+  
+  Detailed import paths for (some of) the these imports:
+  
+      listener.dart => /D:/FLUTTER%20PROJECTS/WORKING/mockathon/test/widget_test.dart => package:mockathon/authentication/welcome_page.dart => package:mockathon/authentication/login_page.dart => package:mockathon/admin/dashboard.dart => dart:html
+  
+  lib/admin/dashboard.dart:93:25: Error: Method not found: 'Blob'.
+        final blob = html.Blob([bytes]);
+                          ^^^^
+  lib/admin/dashboard.dart:94:24: Error: Undefined name 'Url'.
+        final url = html.Url.createObjectUrlFromBlob(blob);
+                         ^^^
+  lib/admin/dashboard.dart:95:27: Error: Method not found: 'AnchorElement'.
+        final anchor = html.AnchorElement(href: url)
+                            ^^^^^^^^^^^^^
+  lib/admin/dashboard.dart:98:12: Error: Undefined name 'Url'.
+        html.Url.revokeObjectUrl(url);
+             ^^^
+  .
+00:00 +0 -1: Some tests failed.

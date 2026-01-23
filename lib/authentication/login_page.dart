@@ -169,7 +169,7 @@ class _LoginPageState extends State<LoginPage> {
                   gradient: AppTheme.lightGradient, // Professional Gradient
                   boxShadow: [
                     BoxShadow(
-                      color: theme.primaryColor.withValues(alpha: 0.3),
+                      color: theme.primaryColor.withOpacity(0.3),
                       blurRadius: 30,
                       spreadRadius: 5,
                       offset: const Offset(0, 10),

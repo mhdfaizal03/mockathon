@@ -61,6 +61,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       );
                     },
                   ),
+                  SafeArea(
+                    child: Image.asset('assets/softlogo.png', height: 100),
+                  ),
+                  SizedBox(height: 100),
                 ],
               ),
             ),
@@ -91,7 +95,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
             },
             child: CircleAvatar(
               radius: 24,
-              backgroundColor: AppTheme.bentoJacket.withValues(alpha: 0.1),
+              backgroundColor: AppTheme.bentoJacket.withOpacity(0.1),
               child: Text(
                 student.name.isNotEmpty ? student.name[0].toUpperCase() : '?',
                 style: const TextStyle(
@@ -116,7 +120,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppTheme.cardLight,
-                border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                border: Border.all(color: Colors.grey.withOpacity(0.3)),
               ),
               child: const Icon(
                 Icons.logout,
@@ -180,7 +184,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     student.stack,
                     style: TextStyle(
                       fontSize: isMobile ? 14 : 16,
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: Colors.white.withOpacity(0.6),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -374,7 +378,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: AppTheme.bentoDecoration(
-            color: _getMarkColor(marks.hr * 10),
+            color: _getMarkColor(marks.hr * 4),
             radius: 36,
           ),
           child: Column(
@@ -400,7 +404,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     ],
                   ),
                   Text(
-                    "${marks.hr.toInt()} / 10",
+                    "${marks.hr.toInt()} / 25",
                     style: const TextStyle(
                       fontSize: 32,
                       color: Colors.white,
@@ -413,7 +417,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.1),
+                    color: Colors.black.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -457,9 +461,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     ),
                   ),
                   Text(
-                    "${marks.gd.toInt()} / 10",
+                    "${marks.gd.toInt()} / 25",
                     style: TextStyle(
-                      color: _getMarkColor(marks.gd * 10),
+                      color: _getMarkColor(marks.gd * 4),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -503,7 +507,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.5),
+            color: Colors.white.withOpacity(0.5),
             fontSize: isMobile ? 8 : 10,
           ),
         ),

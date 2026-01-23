@@ -24,58 +24,46 @@ class WelcomePage extends StatelessWidget {
                   children: [
                     // Branding
                     Hero(
-                          tag: 'app_logo',
-                          child: Container(
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: AppTheme
-                                  .lightGradient, // Beautiful Indigo gradient
-                              boxShadow: [
-                                BoxShadow(
-                                  color: theme.primaryColor.withValues(
-                                    alpha: 0.4,
-                                  ),
-                                  blurRadius: 30,
-                                  spreadRadius: 5,
-                                  offset: const Offset(0, 10),
-                                ),
-                              ],
+                      tag: 'app_logo',
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: AppTheme
+                              .lightGradient, // Beautiful Indigo gradient
+                          boxShadow: [
+                            BoxShadow(
+                              color: theme.primaryColor.withOpacity(0.4),
+                              blurRadius: 30,
+                              spreadRadius: 5,
+                              offset: const Offset(0, 10),
                             ),
-                            child: const Icon(
-                              Icons.rocket_launch_rounded,
-                              size: 64,
-                              color: Colors.white,
-                            ),
-                          ),
-                        )
-                        .animate()
-                        .fade(duration: 600.ms)
-                        .scale(delay: 200.ms, curve: Curves.easeOutBack),
+                          ],
+                        ),
+
+                        child: const Icon(
+                          Icons.rocket_launch_rounded,
+                          size: 64,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 48),
 
                     Text(
-                          "MOCKATHON",
-                          style: theme.textTheme.displayLarge!.copyWith(
-                            letterSpacing: 4,
-                            fontSize: 42,
-                          ),
-                        )
-                        .animate()
-                        .fade(delay: 300.ms, duration: 600.ms)
-                        .slideY(begin: 0.3, end: 0),
+                      "MOCKATHON",
+                      style: theme.textTheme.displayLarge!.copyWith(
+                        letterSpacing: 4,
+                        fontSize: 42,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Text(
-                          "Test What You Are Capable Of",
-                          style: theme.textTheme.bodyLarge!.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(
-                              alpha: 0.6,
-                            ),
-                          ),
-                        )
-                        .animate()
-                        .fade(delay: 500.ms, duration: 600.ms)
-                        .slideY(begin: 0.3, end: 0),
+                      "Test What You Are Capable Of",
+                      style: theme.textTheme.bodyLarge!.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                      ),
+                    ),
 
                     const SizedBox(height: 64),
 
@@ -86,7 +74,7 @@ class WelcomePage extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                         color: theme.colorScheme.onSurface,
                       ),
-                    ).animate().fade(delay: 700.ms),
+                    ),
                     const SizedBox(height: 32),
 
                     Wrap(
@@ -104,23 +92,17 @@ class WelcomePage extends StatelessWidget {
                             .fade(delay: 800.ms)
                             .scale(delay: 800.ms, curve: Curves.easeOutBack),
                         _buildRoleCard(
-                              context,
-                              title: "Interviewer",
-                              icon: Icons.edit_note_rounded,
-                              color: AppTheme.primaryOrange,
-                            )
-                            .animate()
-                            .fade(delay: 1000.ms)
-                            .scale(delay: 1000.ms, curve: Curves.easeOutBack),
+                          context,
+                          title: "Interviewer",
+                          icon: Icons.edit_note_rounded,
+                          color: AppTheme.primaryOrange,
+                        ),
                         _buildRoleCard(
-                              context,
-                              title: "Candidate",
-                              icon: Icons.school_rounded,
-                              color: AppTheme.primaryIndigo,
-                            )
-                            .animate()
-                            .fade(delay: 1200.ms)
-                            .scale(delay: 1200.ms, curve: Curves.easeOutBack),
+                          context,
+                          title: "Candidate",
+                          icon: Icons.school_rounded,
+                          color: AppTheme.primaryIndigo,
+                        ),
                       ],
                     ),
                   ],
@@ -154,12 +136,10 @@ class WelcomePage extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
+          border: Border.all(color: Colors.grey.withOpacity(0.1)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(
-                alpha: 0.05,
-              ), // Soft shadow for light theme
+              color: Colors.black.withOpacity(0.05),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -171,7 +151,7 @@ class WelcomePage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
+                color: color.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 32),

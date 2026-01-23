@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mockathon/admin/dashboard.dart';
 import 'package:mockathon/authentication/welcome_page.dart';
+import 'package:mockathon/core/splash_screen.dart';
 import 'package:mockathon/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -38,7 +39,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Mockathon',
       theme: AppTheme.lightTheme,
-      home: const AuthWrapper(),
+      home: const SplashScreen(),
     );
   }
 }
