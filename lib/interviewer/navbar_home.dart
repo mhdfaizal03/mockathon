@@ -24,9 +24,9 @@ class _NavbarHomeState extends State<NavbarHome> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
+      HrMarkPage(studentId: widget.studentId),
       AptitudeMarkPage(studentId: widget.studentId),
       GdMarkPage(studentId: widget.studentId),
-      HrMarkPage(studentId: widget.studentId),
     ];
 
     return Scaffold(
@@ -90,9 +90,9 @@ class _NavbarHomeState extends State<NavbarHome> {
             ),
           ),
           const SizedBox(height: 48),
-          _buildSidebarItem(0, Icons.psychology, "Aptitude"),
-          _buildSidebarItem(1, Icons.groups, "Group Disc."),
-          _buildSidebarItem(2, Icons.person_search, "Technical / HR"),
+          _buildSidebarItem(0, Icons.person_search, "Technical / HR"),
+          _buildSidebarItem(1, Icons.psychology, "Aptitude"),
+          _buildSidebarItem(2, Icons.groups, "Group Disc."),
           const Spacer(),
           Padding(
             padding: const EdgeInsets.all(24),
@@ -169,14 +169,14 @@ class _NavbarHomeState extends State<NavbarHome> {
           onTap: (index) => setState(() => _currentIndex = index),
           items: const [
             BottomNavigationBarItem(
+              icon: Icon(Icons.person_search),
+              label: 'Tech/HR',
+            ),
+            BottomNavigationBarItem(
               icon: Icon(Icons.psychology),
               label: 'Aptitude',
             ),
             BottomNavigationBarItem(icon: Icon(Icons.groups), label: 'GD'),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_search),
-              label: 'Tech/HR',
-            ),
           ],
         ),
       ),
