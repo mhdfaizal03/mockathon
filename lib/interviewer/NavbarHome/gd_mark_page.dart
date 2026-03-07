@@ -11,6 +11,7 @@ class GdMarkPage extends StatelessWidget {
       title: "Group Discussion Round",
       studentId: studentId,
       markType: 'gd',
+      maxScore: 25.0,
     );
   }
 }

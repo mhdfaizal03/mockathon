@@ -266,7 +266,7 @@ class _RegisterPageState extends State<RegisterPage> {
     ValueChanged<String?> onChanged,
   ) {
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       items: items
           .map(
             (e) => DropdownMenuItem(

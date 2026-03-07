@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mockathon/models/user_models.dart';
 
 class DataService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
 
   // Get users by role
   Stream<List<UserModel>> getUsersByRole(String role) {
@@ -37,7 +37,19 @@ class DataService {
   // Get Student by UID
   Stream<StudentModel> getStudent(String uid) {
     return _firestore.collection('users').doc(uid).snapshots().map((doc) {
-      return StudentModel.fromMap(doc.data() as Map<String, dynamic>);
+      final data = doc.data();
+      if (data == null) {
+        // Return a dummy student model if profile not found to prevent crashes
+        return StudentModel(
+          uid: uid,
+          email: '',
+          name: 'Loading...',
+          stack: '',
+          remainStatus: '',
+          randomId: '',
+        );
+      }
+      return StudentModel.fromMap(data);
     });
   }
 
@@ -49,8 +61,9 @@ class DataService {
   // Get Marks
   Stream<MarkModel?> getMarks(String studentId) {
     return _firestore.collection('marks').doc(studentId).snapshots().map((doc) {
-      if (doc.exists) {
-        return MarkModel.fromMap(doc.data() as Map<String, dynamic>);
+      final data = doc.data();
+      if (data != null) {
+        return MarkModel.fromMap(data);
       }
       return null;
     });

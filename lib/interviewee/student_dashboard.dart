@@ -9,6 +9,10 @@ import 'package:mockathon/interviewee/profile_page.dart';
 import 'package:mockathon/interviewee/notification_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mockathon/authentication/login_page.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:mockathon/services/resume_service.dart';
+import 'dart:typed_data';
 
 class StudentDashboard extends StatefulWidget {
   const StudentDashboard({super.key});
@@ -18,17 +22,84 @@ class StudentDashboard extends StatefulWidget {
 }
 
 class _StudentDashboardState extends State<StudentDashboard> {
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, authSnapshot) {
+        if (authSnapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final user = authSnapshot.data;
+        if (user == null) {
+          return Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text("Session Expired"),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const LoginPage(userType: "Interviewee"),
+                        ),
+                      );
+                    },
+                    child: const Text("Go to Login"),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // Pass the user ID to the content widget.
+        // Using ValueKey ensures that if the user changes (e.g. relogin),
+        // the state is reset and streams are re-initialized.
+        return _DashboardContent(key: ValueKey(user.uid), uid: user.uid);
+      },
+    );
+  }
+}
+
+class _DashboardContent extends StatefulWidget {
+  final String uid;
+
+  const _DashboardContent({super.key, required this.uid});
+
+  @override
+  State<_DashboardContent> createState() => _DashboardContentState();
+}
+
+class _DashboardContentState extends State<_DashboardContent> {
   final AuthService _authService = AuthService();
   final DataService _dataService = DataService();
+  final ResumeService _resumeService = ResumeService();
+
+  bool _isUploading = false;
+  late Stream<StudentModel> _studentStream;
+  late Stream<bool> _resultsPublishedStream;
+  late Stream<MarkModel?> _marksStream;
+  late Stream<List<NotificationModel>> _notificationStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _studentStream = _dataService.getStudent(widget.uid);
+    _resultsPublishedStream = _dataService.getResultsPublishedStream();
+    _marksStream = _dataService.getMarks(widget.uid);
+    _notificationStream = _dataService.getNotifications('interviewee');
+  }
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      // Should be handled by AuthWrapper, but just in case:
-      return const SizedBox();
-    }
-
     return Scaffold(
       backgroundColor: AppTheme.bentoBg,
       body: SafeArea(
@@ -40,31 +111,63 @@ class _StudentDashboardState extends State<StudentDashboard> {
               child: Column(
                 children: [
                   StreamBuilder<StudentModel>(
-                    stream: _dataService.getStudent(user.uid),
+                    stream: _studentStream,
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24.0),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.error_outline,
+                                  color: Colors.red,
+                                  size: 48,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  "Error loading dashboard: ${snapshot.error}",
+                                  textAlign: TextAlign.center,
+                                ),
+                                TextButton(
+                                  onPressed: () => setState(() {}),
+                                  child: const Text("Retry"),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
                       }
+
                       if (!snapshot.hasData) {
-                        return const Center(child: Text("Profile not found"));
+                        // Show skeleton/loading state while fetching profile
+                        return const Padding(
+                          padding: EdgeInsets.all(40.0),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
                       }
+
                       final student = snapshot.data!;
 
                       return Column(
                         children: [
                           _buildHeader(context, student),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 12),
                           _buildIDCard(student),
-                          const SizedBox(height: 32),
-                          _buildMarksSection(user.uid),
+                          const SizedBox(height: 16),
+
+                          _buildCVSection(context, student),
+                          const SizedBox(height: 16),
+                          _buildMarksSection(widget.uid),
                         ],
                       );
                     },
                   ),
                   SafeArea(
-                    child: Image.asset('assets/softlogo.png', height: 100),
+                    child: Image.asset('assets/softlogo.png', height: 80),
                   ),
-                  SizedBox(height: 100),
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
@@ -76,10 +179,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
   Widget _buildHeader(BuildContext context, StudentModel student) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: AppTheme.bentoDecoration(
         color: AppTheme.cardLight,
-        radius: 40,
+        radius: 30,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -94,8 +197,8 @@ class _StudentDashboardState extends State<StudentDashboard> {
               );
             },
             child: CircleAvatar(
-              radius: 24,
-              backgroundColor: AppTheme.bentoJacket.withOpacity(0.1),
+              radius: 20,
+              backgroundColor: AppTheme.bentoJacket.withValues(alpha: 0.1),
               child: Text(
                 student.name.isNotEmpty ? student.name[0].toUpperCase() : '?',
                 style: const TextStyle(
@@ -108,7 +211,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
           const Text(
             "Dashboard",
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
             ),
@@ -120,11 +223,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppTheme.cardLight,
-                border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
               ),
               child: const Icon(
                 Icons.logout,
-                size: 20,
+                size: 18,
                 color: Colors.redAccent,
               ),
             ),
@@ -141,10 +244,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
         return Container(
               width: double.infinity,
-              padding: EdgeInsets.all(isMobile ? 20 : 24),
+              padding: EdgeInsets.all(isMobile ? 16 : 20),
               decoration: AppTheme.bentoDecoration(
                 color: AppTheme.bentoJacket,
-                radius: 36,
+                radius: 30,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,13 +259,13 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       Icon(
                         Icons.cloud,
                         color: Colors.white,
-                        size: isMobile ? 32 : 48,
+                        size: isMobile ? 24 : 32,
                       ),
                       Flexible(
                         child: Text(
                           student.randomId,
                           style: TextStyle(
-                            fontSize: isMobile ? 32 : 48,
+                            fontSize: isMobile ? 24 : 32,
                             fontWeight: FontWeight.w300,
                             color: Colors.white,
                           ),
@@ -171,11 +274,11 @@ class _StudentDashboardState extends State<StudentDashboard> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   Text(
                     student.name,
                     style: TextStyle(
-                      fontSize: isMobile ? 18 : 22,
+                      fontSize: isMobile ? 18 : 20,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
@@ -183,16 +286,16 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   Text(
                     student.stack,
                     style: TextStyle(
-                      fontSize: isMobile ? 14 : 16,
-                      color: Colors.white.withOpacity(0.6),
+                      fontSize: isMobile ? 12 : 14,
+                      color: Colors.white.withValues(alpha: 0.6),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       StreamBuilder<List<NotificationModel>>(
-                        stream: _dataService.getNotifications('interviewee'),
+                        stream: _notificationStream,
                         builder: (context, snapshot) {
                           final count = snapshot.data?.length ?? 0;
                           return InkWell(
@@ -240,37 +343,50 @@ class _StudentDashboardState extends State<StudentDashboard> {
 
   Widget _buildMarksSection(String uid) {
     return StreamBuilder<bool>(
-      stream: _dataService.getResultsPublishedStream(),
+      stream: _resultsPublishedStream,
       builder: (context, settingSnap) {
+        if (settingSnap.hasError) {
+          return Center(
+            child: Text("Error checking results status: ${settingSnap.error}"),
+          );
+        }
+
+        if (!settingSnap.hasData) {
+          return const SizedBox(
+            height: 150,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
         final areResultsPublished = settingSnap.data ?? false;
 
         if (!areResultsPublished) {
           return Container(
             width: double.infinity,
-            height: 200,
+            height: 180,
             padding: const EdgeInsets.all(24),
             decoration: AppTheme.bentoDecoration(
               color: Colors.white,
-              radius: 36,
+              radius: 30,
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.hourglass_empty, size: 48, color: Colors.grey[400]),
-                const SizedBox(height: 16),
+                Icon(Icons.hourglass_empty, size: 40, color: Colors.grey[400]),
+                const SizedBox(height: 12),
                 const Text(
                   "Results Pending",
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 const Text(
-                  "The program is still in progress.\nResults will be published by the admin.",
+                  "Results will be published shortly.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ],
             ),
@@ -278,37 +394,100 @@ class _StudentDashboardState extends State<StudentDashboard> {
         }
 
         return StreamBuilder<MarkModel?>(
-          stream: _dataService.getMarks(uid),
+          stream: _marksStream,
           builder: (context, markSnap) {
+            if (markSnap.connectionState == ConnectionState.waiting) {
+              return const SizedBox(
+                height: 200,
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
             final marks = markSnap.data ?? MarkModel();
 
             return LayoutBuilder(
               builder: (context, constraints) {
-                if (constraints.maxWidth < 600) {
+                // Determine if we can do Bento layout
+                // Using 350 as safe minimum for splitting width
+                final bool isTooNarrow = constraints.maxWidth < 350;
+                final double gap = 10;
+                // Standard height for small cards
+                final double smallHeight = 150;
+                // Big card height = 2 * small + gap
+                final double bigHeight = (smallHeight * 2) + gap;
+
+                if (isTooNarrow) {
                   return Column(
                     children: [
-                      _buildAptitudeCard(marks),
-                      const SizedBox(height: 16),
-                      _buildGdCard(marks),
-                      const SizedBox(height: 16),
-                      _buildHrCard(marks),
+                      _buildAptitudeCard(marks, height: smallHeight),
+                      SizedBox(height: gap),
+                      _buildTechnicalCard(marks, height: smallHeight),
+                      SizedBox(height: gap),
+                      _buildMachineTestCard(marks, height: smallHeight),
+                      SizedBox(height: gap),
+                      _buildGdCard(marks, height: smallHeight),
+                      SizedBox(height: gap),
+                      _buildHrCard(marks, height: smallHeight),
                     ],
                   );
                 }
 
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                // Bento Grid Layout:
+                // [ Aptitude (Big) ]  [ Tech ]
+                //                     [ Machine ]
+                //
+                // [ GD ] [ HR ]
+                return Column(
                   children: [
-                    Expanded(child: _buildAptitudeCard(marks)),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _buildGdCard(marks),
-                          const SizedBox(height: 16),
-                          _buildHrCard(marks),
+                          Expanded(
+                            child: _buildAptitudeCard(marks, height: bigHeight),
+                          ),
+                          SizedBox(width: gap),
+                          Expanded(
+                            child: Column(
+                              children: [
+                                SizedBox(
+                                  height: smallHeight,
+                                  child: _buildTechnicalCard(
+                                    marks,
+                                    height: smallHeight,
+                                  ),
+                                ),
+                                SizedBox(height: gap),
+                                SizedBox(
+                                  height: smallHeight,
+                                  child: _buildMachineTestCard(
+                                    marks,
+                                    height: smallHeight,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
+                    ),
+                    SizedBox(height: gap),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: smallHeight,
+                            child: _buildGdCard(marks, height: smallHeight),
+                          ),
+                        ),
+                        SizedBox(width: gap),
+                        Expanded(
+                          child: SizedBox(
+                            height: smallHeight,
+                            child: _buildHrCard(marks, height: smallHeight),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 );
@@ -320,9 +499,10 @@ class _StudentDashboardState extends State<StudentDashboard> {
     );
   }
 
-  Widget _buildAptitudeCard(MarkModel marks) {
+  Widget _buildAptitudeCard(MarkModel marks, {double height = 180}) {
     return Container(
-      height: 280,
+      height: height, // Dynamic height
+      width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 36),
       child: Column(
@@ -340,11 +520,12 @@ class _StudentDashboardState extends State<StudentDashboard> {
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
+                fontSize: 18,
               ),
             ),
           ),
           const Center(
-            child: Icon(Icons.psychology, size: 64, color: Colors.grey),
+            child: Icon(Icons.psychology, size: 48, color: Colors.grey),
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -352,7 +533,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
               const Text(
                 "Aptitude",
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF333333),
                 ),
@@ -363,7 +544,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     : "No feedback",
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                style: const TextStyle(color: Colors.grey, fontSize: 11),
               ),
             ],
           ),
@@ -372,9 +553,117 @@ class _StudentDashboardState extends State<StudentDashboard> {
     ).animate().fade(duration: 600.ms).scale(curve: Curves.easeOutBack);
   }
 
-  Widget _buildHrCard(MarkModel marks) {
+  Widget _buildTechnicalCard(MarkModel marks, {double height = 180}) {
     return Container(
-          height: 180, // Increased height to accommodate feedback
+          height: height,
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 36),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Icon(Icons.code, color: Colors.grey),
+                  Text(
+                    "${marks.technical.toInt()} / 25",
+                    style: TextStyle(
+                      color: _getMarkColor(marks.technical * 4),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Technical Round",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF333333),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    marks.technicalFeedback.isNotEmpty
+                        ? marks.technicalFeedback
+                        : "No feedback",
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        )
+        .animate()
+        .fade(delay: 100.ms, duration: 600.ms)
+        .slideX(begin: 0.2, end: 0);
+  }
+
+  Widget _buildMachineTestCard(MarkModel marks, {double height = 180}) {
+    return Container(
+          height: height,
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 36),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Icon(Icons.computer, color: Colors.grey),
+                  Text(
+                    "${marks.machineTest.toInt()} / 25",
+                    style: TextStyle(
+                      color: _getMarkColor(marks.machineTest * 4),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Machine Test",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF333333),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    marks.machineTestFeedback.isNotEmpty
+                        ? marks.machineTestFeedback
+                        : "No feedback",
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        )
+        .animate()
+        .fade(delay: 200.ms, duration: 600.ms)
+        .slideX(begin: 0.2, end: 0);
+  }
+
+  Widget _buildHrCard(MarkModel marks, {double height = 180}) {
+    return Container(
+          height: height,
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: AppTheme.bentoDecoration(
@@ -394,21 +683,22 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     children: [
                       const Icon(Icons.person_search, color: Colors.white),
                       const SizedBox(height: 4),
-                      const Text(
-                        "Technical / HR",
+                      Text(
+                        "HR Round",
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
+                          fontSize: 16,
                         ),
                       ),
                     ],
                   ),
                   Text(
                     "${marks.hr.toInt()} / 25",
-                    style: const TextStyle(
-                      fontSize: 32,
+                    style: TextStyle(
+                      fontSize: 20,
                       color: Colors.white,
-                      fontWeight: FontWeight.w300,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
@@ -417,14 +707,14 @@ class _StudentDashboardState extends State<StudentDashboard> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     marks.hrFeedback,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
                   ),
                 ),
             ],
@@ -435,9 +725,9 @@ class _StudentDashboardState extends State<StudentDashboard> {
         .slideX(begin: 0.2, end: 0);
   }
 
-  Widget _buildGdCard(MarkModel marks) {
+  Widget _buildGdCard(MarkModel marks, {double height = 180}) {
     return Container(
-          height: 180, // Increased height
+          height: height,
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 36),
@@ -455,7 +745,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                   const Text(
                     "GD",
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF333333),
                     ),
@@ -465,6 +755,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                     style: TextStyle(
                       color: _getMarkColor(marks.gd * 4),
                       fontWeight: FontWeight.bold,
+                      fontSize: 18,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -474,7 +765,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
                         : "No feedback",
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    style: const TextStyle(color: Colors.grey, fontSize: 11),
                   ),
                 ],
               ),
@@ -507,7 +798,7 @@ class _StudentDashboardState extends State<StudentDashboard> {
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.5),
+            color: Colors.white.withValues(alpha: 0.5),
             fontSize: isMobile ? 8 : 10,
           ),
         ),
@@ -564,5 +855,149 @@ class _StudentDashboardState extends State<StudentDashboard> {
     if (score >= 50) return Colors.orange;
     if (score >= 40) return Colors.amber;
     return Colors.redAccent;
+  }
+
+  Widget _buildCVSection(BuildContext context, StudentModel student) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 36),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F4FF),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.description,
+              color: Color(0xFF4A90E2),
+              size: 32,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Resume / CV",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                Text(
+                  student.cvUrl != null
+                      ? "Resume uploaded"
+                      : "No resume uploaded yet",
+                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          if (student.cvUrl != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                onPressed: () => _launchURL(student.cvUrl!),
+                icon: const Icon(
+                  Icons.visibility,
+                  color: Colors.blueGrey,
+                  size: 20,
+                ),
+                tooltip: "View Resume",
+              ),
+            ),
+          ElevatedButton.icon(
+            onPressed: _isUploading ? null : () => _uploadResume(student.uid),
+            icon: _isUploading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.upload_file, size: 20),
+            label: Text(
+              _isUploading
+                  ? "Uploading..."
+                  : (student.cvUrl != null ? "Update" : "Upload"),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4A90E2),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _uploadResume(String uid) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx'],
+        withData: true,
+      );
+
+      if (result != null) {
+        setState(() => _isUploading = true);
+
+        final platformFile = result.files.single;
+
+        // Handle bytes - if on web bytes are already there, otherwise read from path
+        Uint8List? fileBytes = platformFile.bytes;
+
+        // Removed local file path fallback as it requires dart:io
+        // withData: true ensures bytes are available on mobile too.
+
+        if (fileBytes != null) {
+          String downloadUrl = await _resumeService.uploadResume(
+            fileBytes,
+            platformFile.name,
+            uid,
+          );
+          await _resumeService.updateStudentCvUrl(uid, downloadUrl);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("Resume uploaded successfully!")),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error uploading resume: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  Future<void> _launchURL(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not launch resume URL')),
+        );
+      }
+    }
   }
 }

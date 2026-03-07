@@ -85,8 +85,8 @@ class _HomePageState extends State<HomePage> {
                         borderRadius: BorderRadius.circular(50),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
+                        horizontal: 16,
+                        vertical: 12,
                       ),
                       filled: true,
                       fillColor: Colors.white,
@@ -188,7 +188,7 @@ class _HomePageState extends State<HomePage> {
                                           ),
                                         ],
                                       ),
-                                      const SizedBox(height: 20),
+                                      const SizedBox(height: 12),
                                       // Status Filters
                                       Column(
                                         crossAxisAlignment:
@@ -347,8 +347,8 @@ class _HomePageState extends State<HomePage> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(32),
         gradient: AppTheme.primaryGradient,
@@ -571,7 +571,7 @@ class _HomePageState extends State<HomePage> {
       },
       borderRadius: BorderRadius.circular(32),
       child: Container(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16),
         decoration: AppTheme.modernDecoration(opacity: 1),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

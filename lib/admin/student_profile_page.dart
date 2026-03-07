@@ -3,6 +3,7 @@ import 'package:mockathon/core/theme.dart';
 import 'package:mockathon/models/user_models.dart';
 import 'package:mockathon/services/data_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:mockathon/services/resume_service.dart';
 
 class StudentProfilePage extends StatelessWidget {
   final StudentModel student;
@@ -18,7 +19,7 @@ class StudentProfilePage extends StatelessWidget {
 
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1000),
@@ -53,12 +54,12 @@ class StudentProfilePage extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
                   // Hero Section (Profile + Basic Info)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(32),
+                    padding: const EdgeInsets.all(24),
                     decoration: AppTheme.bentoDecoration(
                       color: AppTheme.bentoJacket,
                       radius: 40,
@@ -127,6 +128,51 @@ class StudentProfilePage extends StatelessWidget {
                                       ),
                                     ],
                                   ),
+                                  if (student.cvUrl != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 16),
+                                      child: Row(
+                                        children: [
+                                          ElevatedButton.icon(
+                                            onPressed: () => ResumeService()
+                                                .launchResume(student.cvUrl!),
+                                            icon: const Icon(
+                                              Icons.visibility,
+                                              size: 18,
+                                            ),
+                                            label: const Text("View"),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.white,
+                                              foregroundColor:
+                                                  AppTheme.bentoJacket,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          ElevatedButton.icon(
+                                            onPressed: () => ResumeService()
+                                                .downloadResume(student.cvUrl!),
+                                            icon: const Icon(
+                                              Icons.download,
+                                              size: 18,
+                                            ),
+                                            label: const Text("Download"),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  AppTheme.bentoAccent,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
@@ -200,43 +246,40 @@ class StudentProfilePage extends StatelessWidget {
                                       bool isMobile =
                                           constraints.maxWidth < 700;
                                       List<Widget> cards = [
-                                        Expanded(
-                                          flex: isMobile ? 0 : 1,
-                                          child: _buildMarkCard(
-                                            "Aptitude",
-                                            marks.aptitude,
-                                            Icons.psychology,
-                                            Colors.blueAccent,
-                                            max: 25,
-                                          ),
+                                        _buildMarkCard(
+                                          "Aptitude",
+                                          marks.aptitude,
+                                          Icons.psychology,
+                                          Colors.blueAccent,
+                                          max: 25,
                                         ),
-                                        SizedBox(
-                                          width: isMobile ? 0 : 16,
-                                          height: isMobile ? 16 : 0,
+                                        _buildMarkCard(
+                                          "Group Discussion",
+                                          marks.gd,
+                                          Icons.groups,
+                                          Colors.purpleAccent,
+                                          max: 25,
                                         ),
-                                        Expanded(
-                                          flex: isMobile ? 0 : 1,
-                                          child: _buildMarkCard(
-                                            "Group Discussion",
-                                            marks.gd,
-                                            Icons.groups,
-                                            Colors.purpleAccent,
-                                            max: 25,
-                                          ),
+                                        _buildMarkCard(
+                                          "HR",
+                                          marks.hr,
+                                          Icons.person_search,
+                                          Colors.orangeAccent,
+                                          max: 25,
                                         ),
-                                        SizedBox(
-                                          width: isMobile ? 0 : 16,
-                                          height: isMobile ? 16 : 0,
+                                        _buildMarkCard(
+                                          "Technical",
+                                          marks.technical,
+                                          Icons.code,
+                                          Colors.tealAccent,
+                                          max: 25,
                                         ),
-                                        Expanded(
-                                          flex: isMobile ? 0 : 1,
-                                          child: _buildMarkCard(
-                                            "Technical / HR",
-                                            marks.hr,
-                                            Icons.person_search,
-                                            Colors.orangeAccent,
-                                            max: 25,
-                                          ),
+                                        _buildMarkCard(
+                                          "Machine Test",
+                                          marks.machineTest,
+                                          Icons.computer,
+                                          Colors.redAccent,
+                                          max: 25,
                                         ),
                                       ];
 
@@ -244,10 +287,35 @@ class StudentProfilePage extends StatelessWidget {
                                         return Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.stretch,
-                                          children: cards,
+                                          children: cards
+                                              .map(
+                                                (c) => Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        bottom: 16,
+                                                      ),
+                                                  child: c,
+                                                ),
+                                              )
+                                              .toList(),
                                         );
                                       }
-                                      return Row(children: cards);
+                                      // Desktop: Use a Wrap for better responsiveness with 5 items
+                                      return Wrap(
+                                        spacing: 16,
+                                        runSpacing: 16,
+                                        children: cards
+                                            .map(
+                                              (c) => SizedBox(
+                                                width:
+                                                    (constraints.maxWidth -
+                                                        32) /
+                                                    3, // 3 cards per row approx
+                                                child: c,
+                                              ),
+                                            )
+                                            .toList(),
+                                      );
                                     },
                                   ),
                                   const SizedBox(height: 24),
@@ -258,7 +326,7 @@ class StudentProfilePage extends StatelessWidget {
                                       marks.gdFeedback.isNotEmpty ||
                                       marks.hrFeedback.isNotEmpty) ...[
                                     Container(
-                                      padding: const EdgeInsets.all(24),
+                                      padding: const EdgeInsets.all(16),
                                       width: double.infinity,
                                       decoration: AppTheme.bentoDecoration(
                                         color: Colors.white,
@@ -291,6 +359,20 @@ class StudentProfilePage extends StatelessWidget {
                                               "HR",
                                               marks.hrFeedback,
                                             ),
+                                          if (marks
+                                              .technicalFeedback
+                                              .isNotEmpty)
+                                            _buildFeedbackItem(
+                                              "Technical",
+                                              marks.technicalFeedback,
+                                            ),
+                                          if (marks
+                                              .machineTestFeedback
+                                              .isNotEmpty)
+                                            _buildFeedbackItem(
+                                              "Machine Test",
+                                              marks.machineTestFeedback,
+                                            ),
                                         ],
                                       ),
                                     ),
@@ -303,7 +385,7 @@ class StudentProfilePage extends StatelessWidget {
                       );
                     },
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -339,7 +421,7 @@ class StudentProfilePage extends StatelessWidget {
     double max = 100,
   }) {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -61,14 +61,14 @@ class _InterviewerNavScreenState extends State<InterviewerNavScreen> {
   Widget _buildSidebar(BuildContext context) {
     return Container(
       width: 250,
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.all(12),
       decoration: AppTheme.bentoDecoration(
         color: AppTheme.bentoJacket,
         radius: 32,
       ),
       child: Column(
         children: [
-          const SizedBox(height: 48),
+          const SizedBox(height: 24),
           const Icon(Icons.psychology, color: Colors.white, size: 48),
           const SizedBox(height: 24),
           const Text(
@@ -136,7 +136,7 @@ class _InterviewerNavScreenState extends State<InterviewerNavScreen> {
 
   Widget _buildMobileNav() {
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.all(12),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       decoration: AppTheme.bentoDecoration(
         color: AppTheme.cardLight,

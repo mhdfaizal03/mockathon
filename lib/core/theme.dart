@@ -87,6 +87,13 @@ class AppTheme {
           ),
         ),
       ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: cardDark,
+        contentTextStyle: GoogleFonts.inter(color: textWhite),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        insetPadding: const EdgeInsets.all(16),
+      ),
     );
   }
 
@@ -159,6 +166,13 @@ class AppTheme {
             fontSize: 16,
           ),
         ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: textBlack,
+        contentTextStyle: GoogleFonts.inter(color: Colors.white),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        insetPadding: const EdgeInsets.all(16),
       ),
     );
   }

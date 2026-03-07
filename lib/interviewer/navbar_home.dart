@@ -3,6 +3,11 @@ import 'package:mockathon/core/theme.dart';
 import 'package:mockathon/interviewer/NavbarHome/aptitude_mark_page.dart';
 import 'package:mockathon/interviewer/NavbarHome/gd_mark_page.dart';
 import 'package:mockathon/interviewer/NavbarHome/hr_mark_page.dart';
+import 'package:mockathon/interviewer/NavbarHome/technical_mark_page.dart';
+import 'package:mockathon/interviewer/NavbarHome/machine_test_mark_page.dart';
+import 'package:mockathon/services/data_service.dart';
+import 'package:mockathon/models/user_models.dart';
+import 'package:mockathon/services/resume_service.dart';
 
 class NavbarHome extends StatefulWidget {
   final String studentId;
@@ -24,6 +29,8 @@ class _NavbarHomeState extends State<NavbarHome> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
+      TechnicalMarkPage(studentId: widget.studentId),
+      MachineTestMarkPage(studentId: widget.studentId),
       HrMarkPage(studentId: widget.studentId),
       AptitudeMarkPage(studentId: widget.studentId),
       GdMarkPage(studentId: widget.studentId),
@@ -78,7 +85,7 @@ class _NavbarHomeState extends State<NavbarHome> {
       ),
       child: Column(
         children: [
-          const SizedBox(height: 40),
+          const SizedBox(height: 24),
           const Icon(Icons.assessment_rounded, color: Colors.white, size: 48),
           const SizedBox(height: 24),
           const Text(
@@ -90,9 +97,11 @@ class _NavbarHomeState extends State<NavbarHome> {
             ),
           ),
           const SizedBox(height: 48),
-          _buildSidebarItem(0, Icons.person_search, "Technical / HR"),
-          _buildSidebarItem(1, Icons.psychology, "Aptitude"),
-          _buildSidebarItem(2, Icons.groups, "Group Disc."),
+          _buildSidebarItem(0, Icons.code, "Technical Round"),
+          _buildSidebarItem(1, Icons.computer, "Machine Test"),
+          _buildSidebarItem(2, Icons.person_search, "HR Round"),
+          _buildSidebarItem(3, Icons.psychology, "Aptitude"),
+          _buildSidebarItem(4, Icons.groups, "Group Disc."),
           const Spacer(),
           Padding(
             padding: const EdgeInsets.all(24),
@@ -117,7 +126,7 @@ class _NavbarHomeState extends State<NavbarHome> {
         onTap: () => setState(() => _currentIndex = index),
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(
             color: isSelected
                 ? Colors.white.withOpacity(0.15)
@@ -150,7 +159,7 @@ class _NavbarHomeState extends State<NavbarHome> {
 
   Widget _buildMobileNavbar() {
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.all(12),
       decoration: AppTheme.bentoDecoration(
         color: Colors.white,
         radius: 40,
@@ -168,9 +177,14 @@ class _NavbarHomeState extends State<NavbarHome> {
           elevation: 0,
           onTap: (index) => setState(() => _currentIndex = index),
           items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.code), label: 'Tech'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.computer),
+              label: 'Machine',
+            ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_search),
-              label: 'Tech/HR',
+              label: 'HR',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.psychology),
@@ -218,7 +232,56 @@ class _NavbarHomeState extends State<NavbarHome> {
               ],
             ),
           ),
-          const SizedBox(width: 48),
+          StreamBuilder<StudentModel>(
+            stream: DataService().getStudent(widget.studentId),
+            builder: (context, snapshot) {
+              final student = snapshot.data;
+              final hasCv = student?.cvUrl != null;
+
+              return Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    if (!hasCv) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text(
+                              "Candidate hasn't uploaded a resume yet",
+                            ),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
+                    ResumeService().downloadResume(student!.cvUrl!);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: hasCv
+                        ? AppTheme.bentoJacket
+                        : Colors.grey.withOpacity(0.2),
+                    foregroundColor: hasCv ? Colors.white : Colors.grey,
+                    elevation: hasCv ? 2 : 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  icon: Icon(
+                    Icons.download_rounded,
+                    size: 18,
+                    color: hasCv ? Colors.white : Colors.grey,
+                  ),
+                  label: const Text("Resume"),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );

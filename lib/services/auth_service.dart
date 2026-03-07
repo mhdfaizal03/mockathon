@@ -4,8 +4,8 @@ import 'package:mockathon/models/user_models.dart';
 import 'dart:math';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseAuth get _auth => FirebaseAuth.instance;
+  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
 
   // Get current user
   User? get currentUser => _auth.currentUser;

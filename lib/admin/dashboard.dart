@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mockathon/core/theme.dart';
 import 'package:mockathon/services/auth_service.dart';
+import 'package:mockathon/services/resume_service.dart';
 import 'package:mockathon/services/data_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:mockathon/models/user_models.dart';
@@ -16,6 +17,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io' show Platform, File;
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:url_launcher/url_launcher.dart';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -63,6 +65,10 @@ class _DashboardState extends State<Dashboard> {
       TextEditingController();
   final TextEditingController _reportMinGDController = TextEditingController();
   final TextEditingController _reportMinHRController = TextEditingController();
+  final TextEditingController _reportMinTechnicalController =
+      TextEditingController();
+  final TextEditingController _reportMinMachineTestController =
+      TextEditingController();
 
   final List<String> _stackOptions = [
     'UI/UX',
@@ -93,6 +99,10 @@ class _DashboardState extends State<Dashboard> {
           "GD Feedback",
           "HR",
           "HR Feedback",
+          "Technical",
+          "Technical Feedback",
+          "Machine Test",
+          "Machine Test Feedback",
           "Total",
         ],
       ];
@@ -130,7 +140,12 @@ class _DashboardState extends State<Dashboard> {
         // Evaluation Filter
         if (_reportEvaluationStatusFilter != 'All') {
           bool isFullyEvaluated =
-              mark != null && mark.aptitude > 0 && mark.gd > 0 && mark.hr > 0;
+              mark != null &&
+              mark.aptitude > 0 &&
+              mark.gd > 0 &&
+              mark.hr > 0 &&
+              mark.technical > 0 &&
+              mark.machineTest > 0;
 
           if (_reportEvaluationStatusFilter == 'Fully Evaluated') {
             if (!isFullyEvaluated) return false;
@@ -175,6 +190,22 @@ class _DashboardState extends State<Dashboard> {
             if ((mark?.hr ?? 0) < minVal) return false;
           }
         }
+        if (_reportMinTechnicalController.text.isNotEmpty) {
+          final double? minVal = double.tryParse(
+            _reportMinTechnicalController.text,
+          );
+          if (minVal != null) {
+            if ((mark?.technical ?? 0) < minVal) return false;
+          }
+        }
+        if (_reportMinMachineTestController.text.isNotEmpty) {
+          final double? minVal = double.tryParse(
+            _reportMinMachineTestController.text,
+          );
+          if (minVal != null) {
+            if ((mark?.machineTest ?? 0) < minVal) return false;
+          }
+        }
 
         return true;
       }).toList();
@@ -198,7 +229,15 @@ class _DashboardState extends State<Dashboard> {
           (mark?.gdFeedback ?? '').replaceAll('\n', ' '),
           mark?.hr ?? 'N/A',
           (mark?.hrFeedback ?? '').replaceAll('\n', ' '),
-          (mark?.aptitude ?? 0) + (mark?.gd ?? 0) + (mark?.hr ?? 0),
+          mark?.technical ?? 'N/A',
+          (mark?.technicalFeedback ?? '').replaceAll('\n', ' '),
+          mark?.machineTest ?? 'N/A',
+          (mark?.machineTestFeedback ?? '').replaceAll('\n', ' '),
+          (mark?.aptitude ?? 0) +
+              (mark?.gd ?? 0) +
+              (mark?.hr ?? 0) +
+              (mark?.technical ?? 0) +
+              (mark?.machineTest ?? 0),
         ]);
       }
 
@@ -289,7 +328,11 @@ class _DashboardState extends State<Dashboard> {
 
   double _getTotalMark(MarkModel? mark) {
     if (mark == null) return 0;
-    return mark.aptitude + mark.gd + mark.hr;
+    return mark.aptitude +
+        mark.gd +
+        mark.hr +
+        mark.technical +
+        mark.machineTest;
   }
 
   @override
@@ -350,10 +393,10 @@ class _DashboardState extends State<Dashboard> {
   Widget _buildHeader(ThemeData theme) {
     final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      margin: EdgeInsets.all(isMobile ? 12 : 16),
+      margin: EdgeInsets.all(isMobile ? 8 : 12),
       padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 16 : 24,
-        vertical: isMobile ? 12 : 16,
+        horizontal: isMobile ? 12 : 16,
+        vertical: isMobile ? 8 : 12,
       ),
       decoration: AppTheme.bentoDecoration(
         color: AppTheme.cardLight,
@@ -431,8 +474,8 @@ class _DashboardState extends State<Dashboard> {
   Widget _buildSideNav(ThemeData theme) {
     return Container(
       width: 250,
-      margin: const EdgeInsets.only(left: 16, top: 16, bottom: 16),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(left: 12, top: 12, bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: AppTheme.bentoDecoration(
         color: AppTheme.cardLight,
         radius: 32,
@@ -449,7 +492,7 @@ class _DashboardState extends State<Dashboard> {
               color: AppTheme.bentoJacket,
             ),
           ),
-          const SizedBox(height: 48),
+          const SizedBox(height: 24),
           _navItem(0, Icons.dashboard, "Overview", theme),
           const SizedBox(height: 12),
           _navItem(1, Icons.people, "Candidates", theme),
@@ -652,7 +695,12 @@ class _DashboardState extends State<Dashboard> {
                 // Calculate marked count based on filtered students
                 int markedCount = filtered.where((s) {
                   final m = marksMap[s.uid];
-                  return m != null && (m.aptitude > 0 || m.gd > 0 || m.hr > 0);
+                  return m != null &&
+                      (m.aptitude > 0 ||
+                          m.gd > 0 ||
+                          m.hr > 0 ||
+                          m.technical > 0 ||
+                          m.machineTest > 0);
                 }).length;
 
                 return LayoutBuilder(
@@ -769,7 +817,11 @@ class _DashboardState extends State<Dashboard> {
                         final m = marksMap[s.uid];
                         bool hasMarks =
                             m != null &&
-                            (m.aptitude > 0 || m.gd > 0 || m.hr > 0);
+                            (m.aptitude > 0 ||
+                                m.gd > 0 ||
+                                m.hr > 0 ||
+                                m.technical > 0 ||
+                                m.machineTest > 0);
 
                         // 1. Must always have marks for this specific list (as it's "Assessment Progress")
                         if (!hasMarks) return false;
@@ -796,8 +848,7 @@ class _DashboardState extends State<Dashboard> {
                         }
 
                         // 5. Mark Filter (Already checked hasMarks, but respecting the UI Toggle)
-                        if (_selectedMarkFilter == 'Unmarked')
-                          return false; // This list only shows marked
+                        if (_selectedMarkFilter == 'Unmarked') return false;
 
                         return true;
                       }).toList();
@@ -901,6 +952,18 @@ class _DashboardState extends State<Dashboard> {
                                               marks?.hr ?? 0,
                                               max: 25,
                                             ),
+                                            const SizedBox(width: 4),
+                                            _miniBadge(
+                                              "TECH",
+                                              marks?.technical ?? 0,
+                                              max: 25,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            _miniBadge(
+                                              "MACH",
+                                              marks?.machineTest ?? 0,
+                                              max: 25,
+                                            ),
                                           ],
                                         ),
                                       ],
@@ -928,7 +991,7 @@ class _DashboardState extends State<Dashboard> {
   Widget _bentoStatCard(String label, String value, Color bg, Color text) {
     final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      padding: EdgeInsets.all(isMobile ? 16 : 20),
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: AppTheme.bentoDecoration(color: bg, radius: 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -950,7 +1013,7 @@ class _DashboardState extends State<Dashboard> {
   Widget _miniBadge(String label, double score, {double max = 100}) {
     final color = score > 0 ? _getMarkColor(score, max: max) : Colors.grey[300];
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color!.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
@@ -986,7 +1049,7 @@ class _DashboardState extends State<Dashboard> {
               child: Container(
                 width: double.infinity,
                 padding: EdgeInsets.all(
-                  MediaQuery.of(context).size.width < 600 ? 16 : 24,
+                  MediaQuery.of(context).size.width < 600 ? 12 : 16,
                 ),
                 decoration: AppTheme.bentoDecoration(
                   color: AppTheme.bentoAccent,
@@ -1158,7 +1221,12 @@ class _DashboardState extends State<Dashboard> {
                     if (_selectedMarkFilter != 'All') {
                       final m = marksMap[user.uid];
                       bool hasMarks =
-                          m != null && (m.aptitude > 0 || m.gd > 0 || m.hr > 0);
+                          m != null &&
+                          (m.aptitude > 0 ||
+                              m.gd > 0 ||
+                              m.hr > 0 ||
+                              m.technical > 0 ||
+                              m.machineTest > 0);
                       if (_selectedMarkFilter == 'Marked' && !hasMarks)
                         return false;
                       if (_selectedMarkFilter == 'Unmarked' && hasMarks)
@@ -1185,98 +1253,116 @@ class _DashboardState extends State<Dashboard> {
                       // ... rest of the item builder
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child:
-                            InkWell(
-                                  onTap: user is StudentModel
-                                      ? () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  StudentProfilePage(
-                                                    student: user,
-                                                  ),
-                                            ),
-                                          );
-                                        }
-                                      : null,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: AppTheme.bentoDecoration(
-                                      color: AppTheme.softWhite,
-                                      radius: 20,
+                        child: InkWell(
+                          onTap: user is StudentModel
+                              ? () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          StudentProfilePage(student: user),
                                     ),
-                                    child: Row(
-                                      children: [
-                                        CircleAvatar(
-                                          backgroundColor: AppTheme.bentoBg,
-                                          child: Icon(
-                                            user is StudentModel
-                                                ? Icons.person
-                                                : Icons.badge,
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 16),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                user.name.isNotEmpty
-                                                    ? user.name
-                                                    : (user is StudentModel
-                                                          ? "Candidate"
-                                                          : user.role.name[0]
-                                                                    .toUpperCase() +
-                                                                user.role.name
-                                                                    .substring(
-                                                                      1,
-                                                                    )),
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                              Text(
-                                                user.email,
-                                                style: const TextStyle(
-                                                  color: Colors.grey,
-                                                  fontSize: 12,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        IconButton(
-                                          icon: Icon(
-                                            Icons.edit_outlined,
-                                            color: Colors.blue[300],
-                                            size: 20,
-                                          ),
-                                          onPressed: () =>
-                                              _showEditUserDialog(user),
-                                        ),
-                                        IconButton(
-                                          icon: Icon(
-                                            Icons.delete_outline,
-                                            color: Colors.red[300],
-                                            size: 20,
-                                          ),
-                                          onPressed: () =>
-                                              _showDeleteConfirmation(user.uid),
-                                        ),
-                                      ],
-                                    ),
+                                  );
+                                }
+                              : null,
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: AppTheme.bentoDecoration(
+                              color: AppTheme.softWhite,
+                              radius: 20,
+                            ),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  backgroundColor: AppTheme.bentoBg,
+                                  child: Icon(
+                                    user is StudentModel
+                                        ? Icons.person
+                                        : Icons.badge,
+                                    color: Colors.grey[600],
                                   ),
-                                )
-                                .animate()
-                                .fade(delay: (index * 50).ms)
-                                .slideY(begin: 0.1, end: 0),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        user.name.isNotEmpty
+                                            ? user.name
+                                            : (user is StudentModel
+                                                  ? "Candidate"
+                                                  : user.role.name[0]
+                                                            .toUpperCase() +
+                                                        user.role.name
+                                                            .substring(1)),
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        user.email,
+                                        style: const TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 12,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (user is StudentModel)
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.download_rounded,
+                                      color: user.cvUrl != null
+                                          ? Colors.green[300]
+                                          : Colors.grey[300],
+                                      size: 20,
+                                    ),
+                                    onPressed: () {
+                                      if (user.cvUrl != null) {
+                                        ResumeService().downloadResume(
+                                          user.cvUrl!,
+                                        );
+                                      } else {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              "No resume uploaded by this candidate",
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.edit_outlined,
+                                    color: Colors.blue[300],
+                                    size: 20,
+                                  ),
+                                  onPressed: () => _showEditUserDialog(user),
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.red[300],
+                                    size: 20,
+                                  ),
+                                  onPressed: () =>
+                                      _showDeleteConfirmation(user.uid),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ).animate().fade(delay: (index * 50).ms).slideY(begin: 0.1, end: 0),
                       );
                     },
                   );
@@ -1340,7 +1426,7 @@ class _DashboardState extends State<Dashboard> {
               const SizedBox(height: 16),
               // Replaced TextField with Dropdown
               DropdownButtonFormField<String>(
-                value: _stackOptions.contains(stackController.text)
+                initialValue: _stackOptions.contains(stackController.text)
                     ? stackController.text
                     : null,
                 decoration: InputDecoration(
@@ -1376,7 +1462,7 @@ class _DashboardState extends State<Dashboard> {
               const SizedBox(height: 16),
               // Status Dropdown
               DropdownButtonFormField<String>(
-                value: selectedStatus,
+                initialValue: selectedStatus,
                 decoration: InputDecoration(
                   labelText: "Status",
                   filled: true,
@@ -1575,7 +1661,7 @@ class _DashboardState extends State<Dashboard> {
               if (user is StudentModel) ...[
                 // Replaced TextField with Dropdown for Edit
                 DropdownButtonFormField<String>(
-                  value: _stackOptions.contains(stackController.text)
+                  initialValue: _stackOptions.contains(stackController.text)
                       ? stackController.text
                       : null,
                   decoration: InputDecoration(
@@ -1596,7 +1682,7 @@ class _DashboardState extends State<Dashboard> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: _remainStatusOptions.contains(selectedStatus)
+                  initialValue: _remainStatusOptions.contains(selectedStatus)
                       ? selectedStatus
                       : null,
                   decoration: InputDecoration(
@@ -2468,6 +2554,48 @@ class _DashboardState extends State<Dashboard> {
                       keyboardType: TextInputType.number,
                       decoration: InputDecoration(
                         labelText: "Min HR",
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 150,
+                    child: TextField(
+                      controller: _reportMinTechnicalController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: "Min Technical",
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 150,
+                    child: TextField(
+                      controller: _reportMinMachineTestController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: "Min Machine Test",
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(

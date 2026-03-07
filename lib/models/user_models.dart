@@ -44,6 +44,7 @@ class StudentModel extends UserModel {
   final String remainStatus;
   final String randomId;
   final List<String> notifications;
+  final String? cvUrl;
 
   StudentModel({
     required super.uid,
@@ -53,6 +54,7 @@ class StudentModel extends UserModel {
     required this.remainStatus,
     required this.randomId,
     this.notifications = const [],
+    this.cvUrl,
     super.hasCompletedOnboarding = false,
   }) : super(role: UserRole.interviewee);
 
@@ -64,6 +66,7 @@ class StudentModel extends UserModel {
       'remainStatus': remainStatus,
       'randomId': randomId,
       'notifications': notifications,
+      'cvUrl': cvUrl,
     });
     return map;
   }
@@ -77,6 +80,7 @@ class StudentModel extends UserModel {
       remainStatus: map['remainStatus'] ?? 'Main Project',
       randomId: map['randomId'] ?? '',
       notifications: List<String>.from(map['notifications'] ?? []),
+      cvUrl: map['cvUrl'],
       hasCompletedOnboarding: map['hasCompletedOnboarding'] ?? false,
     );
   }
@@ -89,6 +93,10 @@ class MarkModel {
   final String gdFeedback;
   final double hr;
   final String hrFeedback;
+  final double technical;
+  final String technicalFeedback;
+  final double machineTest;
+  final String machineTestFeedback;
 
   MarkModel({
     this.aptitude = 0.0,
@@ -97,6 +105,10 @@ class MarkModel {
     this.gdFeedback = '',
     this.hr = 0.0,
     this.hrFeedback = '',
+    this.technical = 0.0,
+    this.technicalFeedback = '',
+    this.machineTest = 0.0,
+    this.machineTestFeedback = '',
   });
 
   Map<String, dynamic> toMap() {
@@ -107,6 +119,10 @@ class MarkModel {
       'gdFeedback': gdFeedback,
       'hr': hr,
       'hrFeedback': hrFeedback,
+      'technical': technical,
+      'technicalFeedback': technicalFeedback,
+      'machineTest': machineTest,
+      'machineTestFeedback': machineTestFeedback,
     };
   }
 
@@ -119,6 +135,10 @@ class MarkModel {
       hr: (map['hr'] ?? 0.0).toDouble(),
       // Fallback for old 'feedback' key if hrFeedback not present
       hrFeedback: map['hrFeedback'] ?? map['feedback'] ?? '',
+      technical: (map['technical'] ?? 0.0).toDouble(),
+      technicalFeedback: map['technicalFeedback'] ?? '',
+      machineTest: (map['machineTest'] ?? 0.0).toDouble(),
+      machineTestFeedback: map['machineTestFeedback'] ?? '',
     );
   }
 }

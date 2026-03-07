@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mockathon/core/theme.dart';
+import 'dart:async';
 import 'package:mockathon/services/data_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:mockathon/models/user_models.dart';
@@ -9,11 +10,14 @@ class MarkForm extends StatefulWidget {
   final String studentId;
   final String markType; // 'aptitude', 'gd', 'hr'
 
+  final double maxScore; // New parameter
+
   const MarkForm({
     super.key,
     required this.title,
     required this.studentId,
     required this.markType,
+    required this.maxScore, // Required
   });
 
   @override
@@ -29,15 +33,25 @@ class _MarkFormState extends State<MarkForm> {
   bool _isLoading = false;
   MarkModel? _currentMarks;
 
+  StreamSubscription<MarkModel?>? _subscription;
+
   @override
   void initState() {
     super.initState();
     _loadMarks();
   }
 
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    _scoreController.dispose();
+    _feedbackController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadMarks() async {
     final stream = _dataService.getMarks(widget.studentId);
-    stream.listen((marks) {
+    _subscription = stream.listen((marks) {
       if (mounted && marks != null) {
         setState(() {
           _currentMarks = marks;
@@ -51,8 +65,15 @@ class _MarkFormState extends State<MarkForm> {
           } else if (widget.markType == 'hr') {
             score = marks.hr;
             _feedbackController.text = marks.hrFeedback;
+          } else if (widget.markType == 'technical') {
+            score = marks.technical;
+            _feedbackController.text = marks.technicalFeedback;
+          } else if (widget.markType == 'machine_test') {
+            score = marks.machineTest;
+            _feedbackController.text = marks.machineTestFeedback;
           }
 
+          // Only set text if not being edited or if empty
           if (_scoreController.text.isEmpty) {
             _scoreController.text = score > 0 ? score.toString() : '';
           }
@@ -82,6 +103,18 @@ class _MarkFormState extends State<MarkForm> {
           hrFeedback: widget.markType == 'hr'
               ? _feedbackController.text
               : (_currentMarks?.hrFeedback ?? ''),
+          technical: widget.markType == 'technical'
+              ? newScore
+              : (_currentMarks?.technical ?? 0),
+          technicalFeedback: widget.markType == 'technical'
+              ? _feedbackController.text
+              : (_currentMarks?.technicalFeedback ?? ''),
+          machineTest: widget.markType == 'machine_test'
+              ? newScore
+              : (_currentMarks?.machineTest ?? 0),
+          machineTestFeedback: widget.markType == 'machine_test'
+              ? _feedbackController.text
+              : (_currentMarks?.machineTestFeedback ?? ''),
         );
 
         await _dataService.updateMarks(widget.studentId, newMarks);
@@ -124,7 +157,7 @@ class _MarkFormState extends State<MarkForm> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(
@@ -134,8 +167,8 @@ class _MarkFormState extends State<MarkForm> {
             children: [
               // Header Card
               Container(
-                margin: const EdgeInsets.only(bottom: 24),
-                padding: const EdgeInsets.all(24),
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
                 decoration: AppTheme.bentoDecoration(
                   color: Colors.white,
                   radius: 32,
@@ -143,7 +176,7 @@ class _MarkFormState extends State<MarkForm> {
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryIndigo.withOpacity(0.1),
                         shape: BoxShape.circle,
@@ -183,7 +216,7 @@ class _MarkFormState extends State<MarkForm> {
 
               // Form Container
               Container(
-                padding: const EdgeInsets.all(32),
+                padding: const EdgeInsets.all(20),
                 decoration: AppTheme.bentoDecoration(
                   color: Colors.white,
                   radius: 32,
@@ -208,7 +241,7 @@ class _MarkFormState extends State<MarkForm> {
 
                         decoration: InputDecoration(
                           hintText: "0",
-                          suffixText: "/ ${_getMaxScore().toInt()}",
+                          suffixText: "/ ${widget.maxScore.toInt()}",
                           suffixStyle: TextStyle(
                             fontSize: 16,
                             color: Colors.grey[500],
@@ -232,14 +265,14 @@ class _MarkFormState extends State<MarkForm> {
                             ),
                           ),
                           contentPadding: const EdgeInsets.symmetric(
-                            vertical: 20,
-                            horizontal: 24,
+                            vertical: 16,
+                            horizontal: 16,
                           ),
                         ),
                         validator: (v) {
                           if (v == null || v.isEmpty) return "Required";
                           final n = double.tryParse(v);
-                          final max = _getMaxScore();
+                          final max = widget.maxScore;
                           if (n == null || n < 0 || n > max) {
                             return "Max allowed is $max";
                           }
@@ -249,7 +282,7 @@ class _MarkFormState extends State<MarkForm> {
                             FocusScope.of(context).nextFocus(),
                       ),
 
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 24),
 
                       _buildLabel("Feedback", Icons.edit_note_rounded),
                       const SizedBox(height: 12),
@@ -276,12 +309,12 @@ class _MarkFormState extends State<MarkForm> {
                               width: 2,
                             ),
                           ),
-                          contentPadding: const EdgeInsets.all(24),
+                          contentPadding: const EdgeInsets.all(16),
                         ),
                         onFieldSubmitted: (_) => _submit(),
                       ),
 
-                      const SizedBox(height: 40),
+                      const SizedBox(height: 24),
 
                       SizedBox(
                         width: double.infinity,
@@ -293,7 +326,7 @@ class _MarkFormState extends State<MarkForm> {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            elevation: 0,
+                            elevation: 0, // Clean flat look
                           ),
                           onPressed: _isLoading ? null : _submit,
                           child: _isLoading
@@ -345,19 +378,6 @@ class _MarkFormState extends State<MarkForm> {
     );
   }
 
-  double _getMaxScore() {
-    switch (widget.markType) {
-      case 'aptitude':
-        return 25.0;
-      case 'gd':
-        return 25.0;
-      case 'hr':
-        return 25.0;
-      default:
-        return 100.0;
-    }
-  }
-
   IconData _getIconForType(String type) {
     switch (type) {
       case 'aptitude':
@@ -366,6 +386,10 @@ class _MarkFormState extends State<MarkForm> {
         return Icons.groups_3_rounded;
       case 'hr':
         return Icons.person_search_rounded;
+      case 'technical':
+        return Icons.code_rounded;
+      case 'machine_test':
+        return Icons.computer_rounded;
       default:
         return Icons.assessment_rounded;
     }

@@ -11,27 +11,25 @@ import 'package:mockathon/models/user_models.dart';
 import 'package:mockathon/interviewee/nav_screen.dart';
 import 'package:mockathon/interviewer/interviewer_nav_screen.dart';
 import 'package:mockathon/interviewee/onboarding_screen.dart';
-import 'package:mockathon/services/notification_service.dart'; // Added import
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // Added import for ProviderScope
-import 'package:flutter/foundation.dart'; // Added import for debugPrint
+import 'package:mockathon/core/supabase_config.dart';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Initialize Notifications
-  try {
-    await NotificationService().init();
-  } catch (e) {
-    debugPrint("Notification Init Error: $e");
-  }
+  await Supabase.initialize(
+    url: SupabaseConfig.supabaseUrl,
+    anonKey: SupabaseConfig.supabaseAnonKey,
+  );
 
   runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
-  // Renamed from MockathonApp
-  const MyApp({super.key}); // Renamed from MockathonApp
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -58,13 +56,48 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        if (snapshot.hasData) {
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(
+              child: Text("Authentication Error: ${snapshot.error}"),
+            ),
+          );
+        }
+
+        if (snapshot.hasData && snapshot.data != null) {
           return StreamBuilder<UserModel?>(
             stream: AuthService().getUserProfileStream(snapshot.data!.uid),
             builder: (context, roleSnap) {
               if (roleSnap.connectionState == ConnectionState.waiting) {
                 return const Scaffold(
                   body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (roleSnap.hasError) {
+                return Scaffold(
+                  body: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            color: Colors.red,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 16),
+                          Text("Error loading profile: ${roleSnap.error}"),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () => AuthService().signOut(),
+                            child: const Text("Sign Out & Retry"),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 );
               }
 

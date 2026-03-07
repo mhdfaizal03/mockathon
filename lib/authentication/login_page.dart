@@ -3,12 +3,6 @@ import 'package:mockathon/core/theme.dart';
 import 'package:mockathon/models/user_models.dart';
 import 'package:mockathon/services/auth_service.dart';
 import 'package:mockathon/authentication/register_page.dart';
-import 'package:mockathon/admin/dashboard.dart';
-
-import 'package:mockathon/interviewee/nav_screen.dart';
-import 'package:mockathon/interviewer/interviewer_nav_screen.dart';
-
-import 'package:mockathon/interviewee/onboarding_screen.dart';
 
 class LoginPage extends StatefulWidget {
   final String userType;
@@ -65,6 +59,7 @@ class _LoginPageState extends State<LoginPage> {
           if ((widget.userType == "Interviewee" ||
                   widget.userType == "Candidate") &&
               user.role != UserRole.interviewee) {
+            // Corrected the line here
             roleMismatch = true;
           }
 
@@ -82,38 +77,20 @@ class _LoginPageState extends State<LoginPage> {
             return;
           }
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Welcome back, ${user.email}"),
-              backgroundColor: Colors.green,
-            ),
-          );
-
-          // Navigate based on role
-          Widget targetPage;
-          switch (user.role) {
-            case UserRole.admin:
-              targetPage = const Dashboard();
-              break;
-            case UserRole.interviewer:
-              targetPage = const InterviewerNavScreen();
-              break;
-            case UserRole.interviewee:
-              if (!user.hasCompletedOnboarding) {
-                targetPage = const OnboardingScreen();
-              } else {
-                targetPage = const NavScreen();
-              }
-              break;
-          }
-
           if (mounted) {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => targetPage),
-              (route) => false,
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("Welcome back, ${user.email}"),
+                backgroundColor: Colors.green,
+              ),
             );
+
+            // If this page was pushed (e.g. from WelcomePage), pop it to reveal the AuthWrapper's new state
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            }
           }
+          // Navigation is now handled automatically by AuthWrappers in main_*.dart
         } else {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -163,7 +140,7 @@ class _LoginPageState extends State<LoginPage> {
               Container(
                 height: 150,
                 width: 150,
-                padding: const EdgeInsets.all(0),
+                padding: EdgeInsets.all(0),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: AppTheme.lightGradient, // Professional Gradient

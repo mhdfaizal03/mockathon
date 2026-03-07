@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mockathon/core/supabase_config.dart';
 import 'package:mockathon/interviewee/nav_screen.dart';
 import 'package:mockathon/interviewee/onboarding_screen.dart';
 import 'package:mockathon/authentication/login_page.dart';
@@ -8,20 +9,18 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:mockathon/core/theme.dart';
 import 'package:mockathon/services/auth_service.dart';
 import 'package:mockathon/models/user_models.dart';
-import 'package:mockathon/services/notification_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
 // INTERVIEWEE (STUDENT) ENTRY POINT
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  try {
-    await NotificationService().init();
-  } catch (e) {
-    debugPrint("Notification Init Error: $e");
-  }
+  await Supabase.initialize(
+    url: SupabaseConfig.supabaseUrl,
+    anonKey: SupabaseConfig.supabaseAnonKey,
+  );
 
   runApp(const ProviderScope(child: IntervieweeApp()));
 }
@@ -54,7 +53,15 @@ class IntervieweeAuthWrapper extends StatelessWidget {
           );
         }
 
-        if (snapshot.hasData) {
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(
+              child: Text("Authentication Error: ${snapshot.error}"),
+            ),
+          );
+        }
+
+        if (snapshot.hasData && snapshot.data != null) {
           return StreamBuilder<UserModel?>(
             stream: AuthService().getUserProfileStream(snapshot.data!.uid),
             builder: (context, roleSnap) {
@@ -64,7 +71,34 @@ class IntervieweeAuthWrapper extends StatelessWidget {
                 );
               }
 
-              if (roleSnap.data != null) {
+              if (roleSnap.hasError) {
+                return Scaffold(
+                  body: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.error_outline,
+                            color: Colors.red,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 16),
+                          Text("Error loading profile: ${roleSnap.error}"),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () => AuthService().signOut(),
+                            child: const Text("Sign Out & Retry"),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              if (roleSnap.hasData && roleSnap.data != null) {
                 final userProfile = roleSnap.data!;
                 if (userProfile.role == UserRole.interviewee) {
                   if (!userProfile.hasCompletedOnboarding) {
@@ -75,12 +109,14 @@ class IntervieweeAuthWrapper extends StatelessWidget {
                   return _buildAccessDenied(context);
                 }
               }
+
+              // Profile exists in Auth but not in Firestore (yet?)
               return const LoginPage(userType: "Interviewee");
             },
           );
         }
 
-        // Direct to Student Login (No Welcome)
+        // Not logged in
         return const LoginPage(userType: "Interviewee");
       },
     );
