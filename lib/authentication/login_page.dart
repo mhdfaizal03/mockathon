@@ -22,18 +22,9 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   bool _isLoading = false;
 
-  // Pre-filled emails for UI convenience
-  static const String _adminEmail = "adminmockathon@gmail.com";
-  static const String _interviewerEmail = "interviewer@mockathon.com";
-
   @override
   void initState() {
     super.initState();
-    if (widget.userType == "Admin") {
-      _emailController.text = _adminEmail;
-    } else if (widget.userType == "Interviewer") {
-      _emailController.text = _interviewerEmail;
-    }
   }
 
   Future<void> _login() async {
@@ -184,15 +175,12 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       TextFormField(
                         controller: _emailController,
-                        readOnly: isAdmin,
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           labelText: "Email",
                           prefixIcon: const Icon(Icons.email_outlined),
                           filled: true,
-                          fillColor: isAdmin
-                              ? Colors.grey[100]
-                              : AppTheme.bentoBg,
+                          fillColor: AppTheme.bentoBg,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
                             borderSide: BorderSide.none,

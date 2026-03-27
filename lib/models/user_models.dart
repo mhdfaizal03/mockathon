@@ -5,6 +5,7 @@ class UserModel {
   final String email;
   final UserRole role;
   final String name;
+  final String branch; // New property
   final bool hasCompletedOnboarding; // New flag
 
   UserModel({
@@ -12,6 +13,7 @@ class UserModel {
     required this.email,
     required this.role,
     this.name = '',
+    this.branch = 'Kozhikode', // Default for legacy users/staff
     this.hasCompletedOnboarding = true, // Default true for staff
   });
 
@@ -21,6 +23,7 @@ class UserModel {
       'email': email,
       'role': role.name,
       'name': name,
+      'branch': branch,
       'hasCompletedOnboarding': hasCompletedOnboarding,
     };
   }
@@ -30,9 +33,10 @@ class UserModel {
       uid: map['uid'] ?? '',
       email: map['email'] ?? '',
       name: map['name'] ?? '',
+      branch: (map['branch'] as String?)?.trim() ?? 'Kozhikode',
       hasCompletedOnboarding: map['hasCompletedOnboarding'] ?? true,
       role: UserRole.values.firstWhere(
-        (e) => e.name == map['role'],
+        (e) => e.name == (map['role'] as String?)?.trim(),
         orElse: () => UserRole.interviewee,
       ),
     );
@@ -50,6 +54,7 @@ class StudentModel extends UserModel {
     required super.uid,
     required super.email,
     required super.name,
+    required super.branch,
     required this.stack,
     required this.remainStatus,
     required this.randomId,
@@ -76,9 +81,10 @@ class StudentModel extends UserModel {
       uid: map['uid'] ?? '',
       email: map['email'] ?? '',
       name: map['name'] ?? '',
+      branch: (map['branch'] as String?)?.trim() ?? 'Kozhikode',
       stack: map['stack'] ?? '',
       remainStatus: map['remainStatus'] ?? 'Main Project',
-      randomId: map['randomId'] ?? '',
+      randomId: (map['randomId'] as String?)?.trim() ?? '',
       notifications: List<String>.from(map['notifications'] ?? []),
       cvUrl: map['cvUrl'],
       hasCompletedOnboarding: map['hasCompletedOnboarding'] ?? false,
@@ -152,6 +158,7 @@ class NotificationModel {
   targetRole; // 'all', 'interviewee', 'interviewer', or specific UID
   final String type; // 'info', 'alert', 'success'
   final double? minMarks;
+  final String branch; // CRITICAL: Isolates notifications to specific locations
 
   NotificationModel({
     required this.id,
@@ -161,6 +168,8 @@ class NotificationModel {
     required this.targetRole,
     this.type = 'info',
     this.minMarks,
+    this.branch =
+        'All', // Default to 'All' for legacy data, but will enforce on read/write
   });
 
   Map<String, dynamic> toMap() {
@@ -172,6 +181,7 @@ class NotificationModel {
       'targetRole': targetRole,
       'type': type,
       'minMarks': minMarks,
+      'branch': branch,
     };
   }
 
@@ -184,6 +194,7 @@ class NotificationModel {
       targetRole: map['targetRole'] ?? 'all',
       type: map['type'] ?? 'info',
       minMarks: map['minMarks']?.toDouble(),
+      branch: (map['branch'] as String?)?.trim() ?? 'All',
     );
   }
 }

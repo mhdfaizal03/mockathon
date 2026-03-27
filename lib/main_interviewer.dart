@@ -11,6 +11,8 @@ import 'package:mockathon/models/user_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
+import 'package:mockathon/core/splash_screen.dart';
+
 // INTERVIEWER ENTRY POINT
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,7 +35,7 @@ class InterviewerApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Mockathon Interviewer',
       theme: AppTheme.lightTheme,
-      home: const InterviewerAuthWrapper(),
+      home: const SplashScreen(target: InterviewerAuthWrapper()),
     );
   }
 }

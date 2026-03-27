@@ -22,8 +22,11 @@ class _HomePageState extends State<HomePage> {
   String _searchQuery = "";
 
   // Filtering
-  static String _selectedStackFilter = 'All';
-  static String _selectedRemainStatusFilter = 'All';
+  String _selectedStackFilter = 'All';
+  String _selectedRemainStatusFilter = 'All';
+  String _selectedBranchFilter = 'All';
+
+  UserModel? _currentUserProfile;
 
   final List<String> _stackOptions = [
     'UI/UX',
@@ -36,15 +39,37 @@ class _HomePageState extends State<HomePage> {
   ];
 
   final List<String> _remainStatusOptions = ['Main Project', 'Mini Project'];
+  final List<String> _branchOptions = [
+    'Kozhikode',
+    'Palakkad',
+    'Perinthalmanna',
+    'Kochi',
+  ];
 
   @override
   void initState() {
     super.initState();
+    _loadCurrentUser();
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text.toLowerCase();
       });
     });
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final user = _authService.currentUser;
+    if (user != null) {
+      final profile = await _authService.getUserProfile(user.uid);
+      if (mounted && profile != null) {
+        setState(() {
+          _currentUserProfile = profile;
+          if (profile.branch != 'All') {
+            _selectedBranchFilter = profile.branch;
+          }
+        });
+      }
+    }
   }
 
   @override
@@ -96,7 +121,9 @@ class _HomePageState extends State<HomePage> {
                 SizedBox(height: 10),
                 Expanded(
                   child: StreamBuilder<List<StudentModel>>(
-                    stream: _dataService.getStudents(),
+                    stream: _dataService.getStudents(
+                      branch: _selectedBranchFilter,
+                    ),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {
                         return const Center(child: CircularProgressIndicator());
@@ -189,6 +216,59 @@ class _HomePageState extends State<HomePage> {
                                         ],
                                       ),
                                       const SizedBox(height: 12),
+                                      // Branch Filters
+                                      if (_currentUserProfile?.branch == 'All')
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                left: 8,
+                                                bottom: 8,
+                                              ),
+                                              child: Text(
+                                                "Filter by Branch",
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.grey[800],
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                            ),
+                                            SingleChildScrollView(
+                                              scrollDirection: Axis.horizontal,
+                                              clipBehavior: Clip.none,
+                                              child: Row(
+                                                children: [
+                                                  ...[
+                                                    'All',
+                                                    ..._branchOptions,
+                                                  ].map(
+                                                    (branch) => Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                            right: 8,
+                                                          ),
+                                                      child: _buildFilterPill(
+                                                        branch,
+                                                        _selectedBranchFilter ==
+                                                            branch,
+                                                        () => setState(
+                                                          () =>
+                                                              _selectedBranchFilter =
+                                                                  branch,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      if (_currentUserProfile?.branch == 'All')
+                                        const SizedBox(height: 12),
                                       // Status Filters
                                       Column(
                                         crossAxisAlignment:

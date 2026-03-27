@@ -4,7 +4,8 @@ import 'package:mockathon/core/theme.dart';
 import 'package:mockathon/main.dart'; // For AuthWrapper
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final Widget? target;
+  const SplashScreen({super.key, this.target});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -22,7 +23,9 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => const AuthWrapper()),
+      MaterialPageRoute(
+        builder: (context) => widget.target ?? const AuthWrapper(),
+      ),
     );
   }
 

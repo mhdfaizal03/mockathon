@@ -12,6 +12,8 @@ import 'package:mockathon/models/user_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
+import 'package:mockathon/core/splash_screen.dart';
+
 // INTERVIEWEE (STUDENT) ENTRY POINT
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,7 +36,7 @@ class IntervieweeApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Mockathon Student',
       theme: AppTheme.lightTheme,
-      home: const IntervieweeAuthWrapper(),
+      home: const SplashScreen(target: IntervieweeAuthWrapper()),
     );
   }
 }

@@ -6,18 +6,15 @@ import 'package:mockathon/services/data_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:mockathon/models/user_models.dart';
 import 'dart:convert';
-import 'dart:html'
-    if (dart.library.io) 'package:mockathon/core/web_stub.dart'
-    as html;
+import 'package:mockathon/core/web_helper.dart';
 
 import 'package:mockathon/admin/student_profile_page.dart';
 import 'package:mockathon/authentication/login_page.dart';
 import 'package:csv/csv.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:io' show Platform, File;
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:url_launcher/url_launcher.dart';
 
 class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
@@ -30,12 +27,34 @@ class _DashboardState extends State<Dashboard> {
   final DataService _dataService = DataService();
   final AuthService _authService = AuthService();
   static int _selectedIndex = 0;
+  UserModel? _currentUserProfile;
+
+  final List<String> _labels = [
+    "Dashboard",
+    "Candidates",
+    "Interviewers",
+    "Admins",
+    "Broadcast",
+    "Publish",
+    "Reports",
+  ];
+
+  final List<IconData> _icons = [
+    Icons.dashboard_rounded,
+    Icons.people_alt_rounded,
+    Icons.badge_rounded,
+    Icons.admin_panel_settings_rounded,
+    Icons.campaign_rounded,
+    Icons.publish_rounded,
+    Icons.assessment_rounded,
+  ];
 
   // Filtering
   String _selectedStackFilter = 'All';
   String _selectedRemainStatusFilter = 'All';
   String _selectedMarkFilter = 'All'; // New Mark Filter
   String _searchQuery = ''; // New Search Query
+  String _selectedBranchFilter = 'All'; // New Branch Filter
   String _selectedSortOption = 'Name A-Z';
   final List<String> _sortOptions = [
     'Name A-Z',
@@ -44,6 +63,27 @@ class _DashboardState extends State<Dashboard> {
     'Marks Low-High',
   ];
   final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentUser();
+  }
+
+  Future<void> _loadCurrentUser() async {
+    final user = _authService.currentUser;
+    if (user != null) {
+      final profile = await _authService.getUserProfile(user.uid);
+      if (mounted && profile != null) {
+        setState(() {
+          _currentUserProfile = profile;
+          if (profile.branch != 'All') {
+            _selectedBranchFilter = profile.branch;
+          }
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -56,6 +96,7 @@ class _DashboardState extends State<Dashboard> {
   String _reportRemainStatusFilter = 'All';
   String _reportOnboardingStatusFilter = 'All'; // New
   String _reportEvaluationStatusFilter = 'All'; // New (Replaces boolean)
+  String _reportBranchFilter = 'All'; // New CSV Export Branch Isolator
   String _reportSearchQuery = '';
   String _reportSortOption = 'Name A-Z';
   final TextEditingController _reportSearchController = TextEditingController();
@@ -81,6 +122,12 @@ class _DashboardState extends State<Dashboard> {
   ];
 
   final List<String> _remainStatusOptions = ['Main Project', 'Mini Project'];
+  final List<String> _branchOptions = [
+    'Kozhikode',
+    'Palakkad',
+    'Perinthalmanna',
+    'Kochi',
+  ];
 
   Future<void> _downloadCsv() async {
     try {
@@ -131,6 +178,12 @@ class _DashboardState extends State<Dashboard> {
         if (_reportOnboardingStatusFilter != 'All') {
           final bool isCompleted = _reportOnboardingStatusFilter == 'Completed';
           if (student.hasCompletedOnboarding != isCompleted) return false;
+        }
+
+        // Branch Isolation Filter for Super Admins
+        if (_reportBranchFilter != 'All' &&
+            student.branch.trim() != _reportBranchFilter.trim()) {
+          return false;
         }
 
         final mark = marksMap[student.uid];
@@ -241,17 +294,15 @@ class _DashboardState extends State<Dashboard> {
         ]);
       }
 
-      String csv = const ListToCsvConverter().convert(rows);
+      String csv = ListToCsvConverter().convert(rows);
 
       if (kIsWeb) {
-        // Web Download
-        final bytes = utf8.encode(csv);
-        final blob = html.Blob([bytes]);
-        final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.AnchorElement(href: url)
-          ..setAttribute("download", "candidates_marks.csv")
-          ..click();
-        html.Url.revokeObjectUrl(url);
+        // Web Download using WebHelper for cross-platform/WASM compatibility
+        WebHelper.downloadFile(
+          bytes: utf8.encode(csv),
+          fileName: "candidates_marks.csv",
+          type: 'text/csv',
+        );
       } else if (Platform.isWindows) {
         // Windows Save
         String? outputFile = await FilePicker.platform.saveFile(
@@ -278,7 +329,6 @@ class _DashboardState extends State<Dashboard> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text("Saved to ${file.path}")));
-        return;
       }
 
       if (mounted) {
@@ -344,9 +394,10 @@ class _DashboardState extends State<Dashboard> {
       _buildAssessmentOverview(theme),
       _buildUserManagement('interviewee', theme),
       _buildUserManagement('interviewer', theme),
+      _buildUserManagement('admin', theme),
       _buildBroadcastScreen(theme),
       _buildPublishScreen(theme),
-      _buildReportsScreen(theme), // Index 5
+      _buildReportsScreen(theme),
     ];
 
     return Scaffold(
@@ -493,17 +544,10 @@ class _DashboardState extends State<Dashboard> {
             ),
           ),
           const SizedBox(height: 24),
-          _navItem(0, Icons.dashboard, "Overview", theme),
-          const SizedBox(height: 12),
-          _navItem(1, Icons.people, "Candidates", theme),
-          const SizedBox(height: 12),
-          _navItem(2, Icons.work, "Interviewers", theme),
-          const SizedBox(height: 12),
-          _navItem(3, Icons.campaign, "Broadcast", theme),
-          const SizedBox(height: 12),
-          _navItem(4, Icons.publish, "Publish Result", theme),
-          const SizedBox(height: 12),
-          _navItem(5, Icons.download_rounded, "Reports", theme),
+          for (int i = 0; i < _labels.length; i++) ...[
+            _navItem(i, _icons[i], _labels[i], theme),
+            const SizedBox(height: 12),
+          ],
           const Spacer(),
           Padding(
             padding: const EdgeInsets.only(bottom: 24),
@@ -530,17 +574,10 @@ class _DashboardState extends State<Dashboard> {
               ),
               const SizedBox(height: 24),
 
-              _navItem(0, Icons.dashboard, "Overview", theme),
-              const SizedBox(height: 12),
-              _navItem(1, Icons.people, "Candidates", theme),
-              const SizedBox(height: 12),
-              _navItem(2, Icons.work, "Interviewers", theme),
-              const SizedBox(height: 12),
-              _navItem(3, Icons.campaign, "Broadcast", theme),
-              const SizedBox(height: 12),
-              _navItem(4, Icons.publish, "Publish Result", theme),
-              const SizedBox(height: 12),
-              _navItem(5, Icons.download_rounded, "Reports", theme),
+              for (int i = 0; i < _labels.length; i++) ...[
+                _navItem(i, _icons[i], _labels[i], theme),
+                const SizedBox(height: 12),
+              ],
               const Spacer(),
               const SizedBox(height: 12),
             ],
@@ -626,6 +663,13 @@ class _DashboardState extends State<Dashboard> {
                     (val) => setState(() => _selectedMarkFilter = val),
                   ),
                   const SizedBox(width: 12),
+                  _buildFilterChip(
+                    "Branch",
+                    _selectedBranchFilter,
+                    ['All', ..._branchOptions],
+                    (val) => setState(() => _selectedBranchFilter = val),
+                  ),
+                  const SizedBox(width: 12),
                   // Sorting Chip
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -675,7 +719,7 @@ class _DashboardState extends State<Dashboard> {
             final marksMap = markSnapshot.data ?? {};
 
             return StreamBuilder<List<StudentModel>>(
-              stream: _dataService.getStudents(),
+              stream: _dataService.getStudents(branch: _selectedBranchFilter),
               builder: (context, snapshot) {
                 final allStudents = snapshot.data ?? [];
                 final filtered = allStudents.where((s) {
@@ -730,16 +774,6 @@ class _DashboardState extends State<Dashboard> {
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: _bentoStatCard(
-                            "Sessions",
-                            "Active",
-                            AppTheme.bentoSurface,
-                            Colors.black87,
-                          ),
                         ),
                       ] else ...[
                         Expanded(
@@ -805,7 +839,9 @@ class _DashboardState extends State<Dashboard> {
                   final marksMap = markSnap.data ?? {};
 
                   return StreamBuilder<List<StudentModel>>(
-                    stream: _dataService.getStudents(),
+                    stream: _dataService.getStudents(
+                      branch: _selectedBranchFilter,
+                    ),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(child: CircularProgressIndicator());
@@ -1059,7 +1095,13 @@ class _DashboardState extends State<Dashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      role == 'interviewee' ? "Candidates" : "Interviewers",
+                      role == 'interviewee'
+                          ? "Candidates"
+                          : role == 'interviewer'
+                          ? "Interviewers"
+                          : role == 'admin'
+                          ? "Admins"
+                          : role[0].toUpperCase() + role.substring(1),
                       style: TextStyle(
                         fontSize: MediaQuery.of(context).size.width < 600
                             ? 20
@@ -1070,18 +1112,20 @@ class _DashboardState extends State<Dashboard> {
                     ),
                     const Text(
                       "Management",
-                      style: TextStyle(color: Colors.white70),
+                      style: const TextStyle(color: Colors.white70),
                     ),
                   ],
                 ),
               ),
             ),
-            if (role == 'interviewer' || role == 'interviewee') ...[
+            if (role == 'admin' ||
+                role == 'interviewer' ||
+                role == 'interviewee') ...[
               const SizedBox(width: 16),
               InkWell(
-                onTap: () => role == 'interviewer'
-                    ? _showAddStaffDialog(role)
-                    : _showAddStudentDialog(),
+                onTap: () => role == 'interviewee'
+                    ? _showAddStudentDialog()
+                    : _showAddStaffDialog(role),
                 child:
                     Container(
                           padding: const EdgeInsets.all(24),
@@ -1111,6 +1155,13 @@ class _DashboardState extends State<Dashboard> {
                 spacing: 3,
                 runSpacing: 3,
                 children: [
+                  _buildFilterChip(
+                    "Branch",
+                    _selectedBranchFilter,
+                    ['All', ..._branchOptions],
+                    (val) => setState(() => _selectedBranchFilter = val),
+                  ),
+                  const SizedBox(width: 5),
                   if (role == 'interviewee') ...[
                     _buildFilterChip(
                       "Stack",
@@ -1189,7 +1240,10 @@ class _DashboardState extends State<Dashboard> {
               final marksMap = markSnap.data ?? {};
 
               return StreamBuilder<List<UserModel>>(
-                stream: _dataService.getUsersByRole(role),
+                stream: _dataService.getUsersByRole(
+                  role,
+                  branch: _selectedBranchFilter,
+                ),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
@@ -1244,127 +1298,237 @@ class _DashboardState extends State<Dashboard> {
                     return a.name.toLowerCase().compareTo(b.name.toLowerCase());
                   });
 
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: users.length,
-                    itemBuilder: (context, index) {
-                      final user = users[index];
-                      // ... rest of the item builder
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: InkWell(
-                          onTap: user is StudentModel
-                              ? () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          StudentProfilePage(student: user),
-                                    ),
-                                  );
-                                }
-                              : null,
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: AppTheme.bentoDecoration(
-                              color: AppTheme.softWhite,
-                              radius: 20,
+                  if (users.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 40),
+                        child: Column(
+                          children: [
+                            Icon(
+                              role == 'interviewee'
+                                  ? Icons.person_off_outlined
+                                  : Icons.badge_outlined,
+                              size: 64,
+                              color: Colors.grey[300],
                             ),
-                            child: Row(
-                              children: [
-                                CircleAvatar(
-                                  backgroundColor: AppTheme.bentoBg,
-                                  child: Icon(
-                                    user is StudentModel
-                                        ? Icons.person
-                                        : Icons.badge,
-                                    color: Colors.grey[600],
-                                  ),
+                            const SizedBox(height: 16),
+                            Text(
+                              "No ${role == 'interviewee'
+                                  ? 'Candidates'
+                                  : role == 'interviewer'
+                                  ? 'Interviewers'
+                                  : 'Admins'} found ${_selectedBranchFilter != 'All' ? 'in $_selectedBranchFilter' : ''}",
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _selectedBranchFilter = 'All';
+                                  _selectedStackFilter = 'All';
+                                  _selectedRemainStatusFilter = 'All';
+                                  _selectedMarkFilter = 'All';
+                                  _searchController.clear();
+                                  _searchQuery = '';
+                                });
+                              },
+                              icon: const Icon(Icons.filter_alt_off),
+                              label: const Text("Clear All Filters"),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "Showing ${users.length} of ${allUsers.length} ${role == 'interviewee'
+                                  ? 'Candidates'
+                                  : role == 'interviewer'
+                                  ? 'Interviewers'
+                                  : 'Admins'}",
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13,
+                              ),
+                            ),
+                            if (users.length < allUsers.length)
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedBranchFilter = 'All';
+                                    _selectedStackFilter = 'All';
+                                    _selectedRemainStatusFilter = 'All';
+                                    _selectedMarkFilter = 'All';
+                                    _searchController.clear();
+                                    _searchQuery = '';
+                                  });
+                                },
+                                child: const Text(
+                                  "Reset",
+                                  style: TextStyle(fontSize: 12),
                                 ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        user.name.isNotEmpty
-                                            ? user.name
-                                            : (user is StudentModel
-                                                  ? "Candidate"
-                                                  : user.role.name[0]
-                                                            .toUpperCase() +
-                                                        user.role.name
-                                                            .substring(1)),
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
+                              ),
+                          ],
+                        ),
+                      ),
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: users.length,
+                        itemBuilder: (context, index) {
+                          final user = users[index];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: InkWell(
+                              onTap: user is StudentModel
+                                  ? () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              StudentProfilePage(student: user),
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      Text(
-                                        user.email,
-                                        style: const TextStyle(
-                                          color: Colors.grey,
-                                          fontSize: 12,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
+                                      );
+                                    }
+                                  : null,
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: AppTheme.bentoDecoration(
+                                  color: AppTheme.softWhite,
+                                  radius: 20,
                                 ),
-                                if (user is StudentModel)
-                                  IconButton(
-                                    icon: Icon(
-                                      Icons.download_rounded,
-                                      color: user.cvUrl != null
-                                          ? Colors.green[300]
-                                          : Colors.grey[300],
-                                      size: 20,
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      backgroundColor: AppTheme.bentoBg,
+                                      child: Icon(
+                                        user is StudentModel
+                                            ? Icons.person
+                                            : Icons.badge,
+                                        color: Colors.grey[600],
+                                      ),
                                     ),
-                                    onPressed: () {
-                                      if (user.cvUrl != null) {
-                                        ResumeService().downloadResume(
-                                          user.cvUrl!,
-                                        );
-                                      } else {
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              "No resume uploaded by this candidate",
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            user.name.isNotEmpty
+                                                ? user.name
+                                                : (user is StudentModel
+                                                      ? "Candidate"
+                                                      : user.role.name[0]
+                                                                .toUpperCase() +
+                                                            user.role.name
+                                                                .substring(1)),
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            user.email,
+                                            style: const TextStyle(
+                                              color: Colors.grey,
+                                              fontSize: 12,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.bentoAccent
+                                                  .withValues(alpha: 0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: Text(
+                                              user.branch,
+                                              style: const TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppTheme.bentoAccent,
+                                              ),
                                             ),
                                           ),
-                                        );
-                                      }
-                                    },
-                                  ),
-                                IconButton(
-                                  icon: Icon(
-                                    Icons.edit_outlined,
-                                    color: Colors.blue[300],
-                                    size: 20,
-                                  ),
-                                  onPressed: () => _showEditUserDialog(user),
+                                        ],
+                                      ),
+                                    ),
+                                    if (user is StudentModel)
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.download_rounded,
+                                          color: user.cvUrl != null
+                                              ? Colors.green[300]
+                                              : Colors.grey[300],
+                                          size: 20,
+                                        ),
+                                        onPressed: () {
+                                          if (user.cvUrl != null) {
+                                            ResumeService().downloadResume(
+                                              user.cvUrl!,
+                                            );
+                                          } else {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  "No resume uploaded by this candidate",
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.edit_outlined,
+                                        color: Colors.blue[300],
+                                        size: 20,
+                                      ),
+                                      onPressed: () =>
+                                          _showEditUserDialog(user),
+                                    ),
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.red[300],
+                                        size: 20,
+                                      ),
+                                      onPressed: () =>
+                                          _showDeleteConfirmation(user.uid),
+                                    ),
+                                  ],
                                 ),
-                                IconButton(
-                                  icon: Icon(
-                                    Icons.delete_outline,
-                                    color: Colors.red[300],
-                                    size: 20,
-                                  ),
-                                  onPressed: () =>
-                                      _showDeleteConfirmation(user.uid),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ).animate().fade(delay: (index * 50).ms).slideY(begin: 0.1, end: 0),
-                      );
-                    },
+                              ),
+                            ).animate().fade(delay: (index * 50).ms).slideY(begin: 0.1, end: 0),
+                          );
+                        },
+                      ),
+                    ],
                   );
                 },
               );
@@ -1384,18 +1548,224 @@ class _DashboardState extends State<Dashboard> {
     final stackController = TextEditingController();
     // Default Status
     String selectedStatus = _remainStatusOptions.first;
+    String selectedBranch =
+        _currentUserProfile?.branch != 'All' && _currentUserProfile != null
+        ? _currentUserProfile!.branch
+        : (_selectedBranchFilter != 'All'
+              ? _selectedBranchFilter
+              : 'Kozhikode');
+
+    bool isLoading = false;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Text(
-          "Add New Student",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: const Text(
+            "Add New Student",
+            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: InputDecoration(
+                    labelText: "Full Name",
+                    filled: true,
+                    fillColor: AppTheme.bentoBg,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: emailController,
+                  decoration: InputDecoration(
+                    labelText: "Email",
+                    filled: true,
+                    fillColor: AppTheme.bentoBg,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: stackController.text.isNotEmpty
+                      ? stackController.text
+                      : null,
+                  decoration: InputDecoration(
+                    labelText: "Stack / Discipline",
+                    filled: true,
+                    fillColor: AppTheme.bentoBg,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: _stackOptions.map((stack) {
+                    return DropdownMenuItem(value: stack, child: Text(stack));
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setDialogState(() => stackController.text = val);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: passController,
+                  decoration: InputDecoration(
+                    labelText: "Password",
+                    filled: true,
+                    fillColor: AppTheme.bentoBg,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  obscureText: true,
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedStatus,
+                  decoration: InputDecoration(
+                    labelText: "Status",
+                    filled: true,
+                    fillColor: AppTheme.bentoBg,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: _remainStatusOptions.map((status) {
+                    return DropdownMenuItem(value: status, child: Text(status));
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => selectedStatus = val);
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedBranch,
+                  decoration: InputDecoration(
+                    labelText: "Branch",
+                    filled: true,
+                    fillColor: AppTheme.bentoBg,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: _branchOptions
+                      .map((b) => DropdownMenuItem(value: b, child: Text(b)))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => selectedBranch = val);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.bentoJacket,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      setDialogState(() => isLoading = true);
+                      try {
+                        await _authService.registerStudent(
+                          emailController.text,
+                          passController.text,
+                          nameController.text,
+                          stackController.text,
+                          selectedStatus,
+                          selectedBranch,
+                        );
+                        if (context.mounted) Navigator.pop(context);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Student added successfully!"),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("Error adding student: $e")),
+                          );
+                        }
+                      } finally {
+                        if (context.mounted) {
+                          setDialogState(() => isLoading = false);
+                        }
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text("ADD", style: TextStyle(color: Colors.white)),
+            ),
+          ],
         ),
-        content: SingleChildScrollView(
-          child: Column(
+      ),
+    );
+  }
+
+  void _showAddStaffDialog(String role) {
+    final emailController = TextEditingController();
+    final passController = TextEditingController();
+    final nameController = TextEditingController();
+    String selectedBranch =
+        _currentUserProfile?.branch != 'All' && _currentUserProfile != null
+        ? _currentUserProfile!.branch
+        : (_selectedBranchFilter != 'All' ? _selectedBranchFilter : 'All');
+
+    String selectedRole = role == 'admin' ? 'admin' : 'interviewer';
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          title: Text(
+            "Add New ${selectedRole[0].toUpperCase() + selectedRole.substring(1)}",
+            style: const TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
@@ -1424,28 +1794,6 @@ class _DashboardState extends State<Dashboard> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Replaced TextField with Dropdown
-              DropdownButtonFormField<String>(
-                initialValue: _stackOptions.contains(stackController.text)
-                    ? stackController.text
-                    : null,
-                decoration: InputDecoration(
-                  labelText: "Stack / Discipline",
-                  filled: true,
-                  fillColor: AppTheme.bentoBg,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                items: _stackOptions.map((stack) {
-                  return DropdownMenuItem(value: stack, child: Text(stack));
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) stackController.text = val;
-                },
-              ),
-              const SizedBox(height: 16),
               TextField(
                 controller: passController,
                 decoration: InputDecoration(
@@ -1460,11 +1808,11 @@ class _DashboardState extends State<Dashboard> {
                 obscureText: true,
               ),
               const SizedBox(height: 16),
-              // Status Dropdown
+              const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                initialValue: selectedStatus,
+                value: selectedRole,
                 decoration: InputDecoration(
-                  labelText: "Status",
+                  labelText: "Role",
                   filled: true,
                   fillColor: AppTheme.bentoBg,
                   border: OutlineInputBorder(
@@ -1472,138 +1820,101 @@ class _DashboardState extends State<Dashboard> {
                     borderSide: BorderSide.none,
                   ),
                 ),
-                items: _remainStatusOptions.map((status) {
-                  return DropdownMenuItem(value: status, child: Text(status));
-                }).toList(),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'interviewer',
+                    child: Text("Interviewer"),
+                  ),
+                  DropdownMenuItem(value: 'admin', child: Text("Admin")),
+                ],
                 onChanged: (val) {
-                  if (val != null) selectedStatus = val;
+                  if (val != null) setDialogState(() => selectedRole = val);
+                },
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: selectedBranch,
+                decoration: InputDecoration(
+                  labelText: "Branch",
+                  filled: true,
+                  fillColor: AppTheme.bentoBg,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                items: ['All', ..._branchOptions]
+                    .map((b) => DropdownMenuItem(value: b, child: Text(b)))
+                    .toList(),
+                onChanged: (val) {
+                  if (val != null) setDialogState(() => selectedBranch = val);
                 },
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.bentoJacket,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(context),
+              child: const Text("Cancel"),
             ),
-            onPressed: () async {
-              try {
-                await _authService.registerStudent(
-                  emailController.text,
-                  passController.text,
-                  nameController.text,
-                  stackController.text,
-                  selectedStatus,
-                );
-                if (context.mounted) Navigator.pop(context);
-              } catch (e) {
-                // handle error
-              }
-            },
-            child: const Text("ADD", style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddStaffDialog(String role) {
-    final emailController = TextEditingController();
-    final passController = TextEditingController();
-    final nameController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text(
-          "Add New $role",
-          style: const TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                labelText: "Full Name",
-                filled: true,
-                fillColor: AppTheme.bentoBg,
-                border: OutlineInputBorder(
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.bentoJacket,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: emailController,
-              decoration: InputDecoration(
-                labelText: "Email",
-                filled: true,
-                fillColor: AppTheme.bentoBg,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: passController,
-              decoration: InputDecoration(
-                labelText: "Password",
-                filled: true,
-                fillColor: AppTheme.bentoBg,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              obscureText: true,
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      setDialogState(() => isLoading = true);
+                      try {
+                        await _authService.registerStaff(
+                          emailController.text,
+                          passController.text,
+                          nameController.text,
+                          selectedRole == 'interviewer'
+                              ? UserRole.interviewer
+                              : UserRole.admin,
+                          selectedBranch,
+                        );
+                        if (context.mounted) Navigator.pop(context);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                "${selectedRole[0].toUpperCase() + selectedRole.substring(1)} added successfully!",
+                              ),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text("Error adding $selectedRole: $e"),
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (context.mounted) {
+                          setDialogState(() => isLoading = false);
+                        }
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Text("ADD", style: TextStyle(color: Colors.white)),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.bentoJacket,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onPressed: () async {
-              try {
-                await _authService.registerStaff(
-                  emailController.text,
-                  passController.text,
-                  nameController.text,
-                  role == 'interviewer' ? UserRole.interviewer : UserRole.admin,
-                );
-                if (context.mounted) Navigator.pop(context);
-              } catch (e) {
-                // handle error
-              }
-            },
-            child: const Text("ADD", style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }
@@ -1617,6 +1928,11 @@ class _DashboardState extends State<Dashboard> {
     String selectedStatus = user is StudentModel
         ? user.remainStatus
         : 'Main Project';
+    String selectedBranch =
+        (user is StudentModel ? _branchOptions : ['All', ..._branchOptions])
+            .contains(user.branch)
+        ? user.branch
+        : 'Kozhikode';
 
     showDialog(
       context: context,
@@ -1702,6 +2018,33 @@ class _DashboardState extends State<Dashboard> {
                   },
                 ),
               ],
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: selectedBranch,
+                decoration: InputDecoration(
+                  labelText: "Branch",
+                  filled: true,
+                  fillColor: AppTheme.bentoBg,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                items:
+                    (user is StudentModel
+                            ? _branchOptions
+                            : ['All', ..._branchOptions])
+                        .map((branch) {
+                          return DropdownMenuItem(
+                            value: branch,
+                            child: Text(branch),
+                          );
+                        })
+                        .toList(),
+                onChanged: (val) {
+                  if (val != null) selectedBranch = val;
+                },
+              ),
             ],
           ),
         ),
@@ -1726,15 +2069,20 @@ class _DashboardState extends State<Dashboard> {
                   name: nameController.text,
                   stack: stackController.text,
                   remainStatus: selectedStatus,
+                  branch: selectedBranch,
                   randomId: user.randomId,
                   notifications: user.notifications,
+                  cvUrl: user.cvUrl,
+                  hasCompletedOnboarding: user.hasCompletedOnboarding,
                 );
               } else {
                 updatedUser = UserModel(
                   uid: user.uid,
                   email: user.email,
                   name: nameController.text,
+                  branch: selectedBranch,
                   role: user.role,
+                  hasCompletedOnboarding: user.hasCompletedOnboarding,
                 );
               }
               await _dataService.updateUser(updatedUser);
@@ -1830,6 +2178,7 @@ class _DashboardState extends State<Dashboard> {
     final messageController = TextEditingController();
     final minMarksController = TextEditingController(); // New
     String targetRole = 'all';
+    String targetBranch = _currentUserProfile?.branch ?? 'All';
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     final presets = [
@@ -2024,6 +2373,25 @@ class _DashboardState extends State<Dashboard> {
                               setInnerState(() => targetRole = val!),
                         ),
                         const SizedBox(height: 16),
+
+                        DropdownButtonFormField<String>(
+                          value: targetBranch,
+                          decoration: InputDecoration(
+                            labelText: "Target Branch",
+                            filled: true,
+                            fillColor: AppTheme.bentoBg,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                          ),
+                          items: ['All', ..._branchOptions].map((b) {
+                            return DropdownMenuItem(value: b, child: Text(b));
+                          }).toList(),
+                          onChanged: (val) =>
+                              setInnerState(() => targetBranch = val!),
+                        ),
+                        const SizedBox(height: 16),
                         // Min Marks Filter
                         if (targetRole == 'interviewee' || targetRole == 'all')
                           TextField(
@@ -2068,6 +2436,7 @@ class _DashboardState extends State<Dashboard> {
                           timestamp: DateTime.now(),
                           targetRole: targetRole,
                           minMarks: double.tryParse(minMarksController.text),
+                          branch: targetBranch,
                         ),
                       );
                       titleController.clear();
@@ -2103,12 +2472,14 @@ class _DashboardState extends State<Dashboard> {
         final double titleSize = isMobile ? 20 : 24;
         final double statusSize = isMobile ? 14 : 18;
         final double iconSize = isMobile ? 48 : 64;
+        final actualBranch = _selectedBranchFilter;
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(
             children: [
               Container(
+                width: double.infinity,
                 padding: EdgeInsets.all(containerPadding),
                 decoration: AppTheme.bentoDecoration(
                   color: AppTheme.bentoAccent,
@@ -2136,44 +2507,78 @@ class _DashboardState extends State<Dashboard> {
                         fontSize: isMobile ? 13 : 14,
                       ),
                     ),
+                    const SizedBox(height: 24),
+                    _buildFilterChip(
+                      "Branch",
+                      _selectedBranchFilter,
+                      ['All', ..._branchOptions],
+                      (val) => setState(() => _selectedBranchFilter = val),
+                    ),
                     const SizedBox(height: 32),
                     StreamBuilder<bool>(
-                      stream: _dataService.getResultsPublishedStream(),
+                      key: ValueKey(actualBranch),
+                      stream: _dataService.getResultsPublishedStream(
+                        branch: actualBranch,
+                      ),
                       builder: (context, snapshot) {
                         final isPublished = snapshot.data ?? false;
-                        return Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isMobile ? 16 : 24,
-                            vertical: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  isPublished
-                                      ? "STATUS: LIVE"
-                                      : "STATUS: RESTRICTED",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: statusSize,
-                                    letterSpacing: 1.5,
+                        final bool isAllSelected = actualBranch == 'All';
+
+                        return Column(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isMobile ? 16 : 24,
+                                vertical: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      isPublished
+                                          ? "${actualBranch.toUpperCase()}: LIVE"
+                                          : "${actualBranch.toUpperCase()}: RESTRICTED",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: statusSize,
+                                        letterSpacing: 1.5,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                  overflow: TextOverflow.ellipsis,
+                                  Switch(
+                                    value: isPublished,
+                                    activeThumbColor: Colors.greenAccent,
+                                    onChanged: isAllSelected
+                                        ? null
+                                        : (val) => _confirmPublishResults(
+                                            val,
+                                            actualBranch,
+                                          ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isAllSelected)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: Text(
+                                  "⚠️ Please select a specific branch to update results visibility",
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.8),
+                                    fontSize: 12,
+                                    fontStyle: FontStyle.italic,
+                                  ),
                                 ),
                               ),
-                              Switch(
-                                value: isPublished,
-                                activeThumbColor: Colors.greenAccent,
-                                onChanged: (val) => _confirmPublishResults(val),
-                              ),
-                            ],
-                          ),
+                          ],
                         );
                       },
                     ),
@@ -2182,6 +2587,7 @@ class _DashboardState extends State<Dashboard> {
               ),
               const SizedBox(height: 24),
               Container(
+                width: double.infinity,
                 padding: EdgeInsets.all(containerPadding),
                 decoration: AppTheme.bentoDecoration(
                   color: AppTheme.bentoSurface,
@@ -2199,17 +2605,18 @@ class _DashboardState extends State<Dashboard> {
                     ),
                     const SizedBox(height: 16),
                     const BulletItem(
-                      "Ensure all interviewers have submitted marks.",
+                      "Publishing results allows students in that specific branch to see their marks.",
                     ),
                     const BulletItem(
-                      "Unpublishing will hide results immediately.",
+                      "Ensure all assessments for a branch are completed before publishing.",
                     ),
                     const BulletItem(
-                      "Students will receive a notification if enabled.",
+                      "You can toggle visibility off at any time to restrict access.",
                     ),
                   ],
                 ),
               ),
+              const SizedBox(height: 40),
             ],
           ),
         );
@@ -2217,20 +2624,20 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  void _confirmPublishResults(bool value) async {
+  void _confirmPublishResults(bool value, String branch) async {
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-          value ? "Publish Results?" : "Hide Results?",
+          value ? "Publish Results for $branch?" : "Hide Results for $branch?",
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         content: Text(
           value
-              ? "This will make marks visible to all students immediately."
-              : "This will hide marks from all students.",
+              ? "This will make marks visible to all $branch students immediately."
+              : "This will hide marks from all $branch students.",
         ),
         actions: [
           TextButton(
@@ -2252,7 +2659,7 @@ class _DashboardState extends State<Dashboard> {
     );
 
     if (confirm == true) {
-      await _dataService.updateResultsPublished(value);
+      await _dataService.updateResultsPublished(value, branch: branch);
     }
   }
 
@@ -2288,7 +2695,7 @@ class _DashboardState extends State<Dashboard> {
     String label,
     String selectedValue,
     List<String> options,
-    ValueChanged<String> onSelected,
+    ValueChanged<String>? onSelected,
   ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -2321,7 +2728,7 @@ class _DashboardState extends State<Dashboard> {
               return DropdownMenuItem(value: e, child: Text(e));
             }).toList(),
             onChanged: (val) {
-              if (val != null) onSelected(val);
+              if (val != null) onSelected?.call(val);
             },
           ),
         ],
@@ -2415,6 +2822,13 @@ class _DashboardState extends State<Dashboard> {
                     _reportRemainStatusFilter,
                     ['All', ..._remainStatusOptions],
                     (val) => setState(() => _reportRemainStatusFilter = val),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildFilterChip(
+                    "Branch",
+                    _reportBranchFilter,
+                    ['All', ..._branchOptions],
+                    (val) => setState(() => _reportBranchFilter = val),
                   ),
                   const SizedBox(width: 12),
                   // Report Sorting

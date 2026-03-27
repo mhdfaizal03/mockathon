@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mockathon/core/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:html' as html;
+import 'package:mockathon/core/web_helper.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ResumeService {
@@ -59,12 +59,7 @@ class ResumeService {
   void downloadResume(String url) {
     if (kIsWeb) {
       // Create an anchor element with the download attribute
-      final anchor = html.AnchorElement(href: url)
-        ..target = '_blank'
-        ..download = 'resume.pdf'; // Optional: suggest a filename
-
-      // Programmatically click the anchor
-      anchor.click();
+      WebHelper.downloadFromUrl(url, 'resume.pdf');
     } else {
       // For mobile, launchUrl usually handles download intents or opens in browser which allows download
       launchResume(url);

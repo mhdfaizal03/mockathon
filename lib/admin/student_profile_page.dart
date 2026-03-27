@@ -126,6 +126,8 @@ class StudentProfilePage extends StatelessWidget {
                                         student.remainStatus,
                                         Colors.white24,
                                       ),
+                                      const SizedBox(width: 8),
+                                      _badge(student.branch, Colors.white24),
                                     ],
                                   ),
                                   if (student.cvUrl != null)
@@ -186,7 +188,9 @@ class StudentProfilePage extends StatelessWidget {
                   // Marks Section
                   // Marks Section
                   StreamBuilder<bool>(
-                    stream: dataService.getResultsPublishedStream(),
+                    stream: dataService.getResultsPublishedStream(
+                      branch: student.branch,
+                    ),
                     builder: (context, pubSnap) {
                       final isPublished = pubSnap.data ?? false;
 

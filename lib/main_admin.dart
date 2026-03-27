@@ -11,6 +11,8 @@ import 'package:mockathon/models/user_models.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 
+import 'package:mockathon/core/splash_screen.dart';
+
 // ADMIN ENTRY POINT
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,7 +35,7 @@ class AdminApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Mockathon Admin',
       theme: AppTheme.lightTheme,
-      home: const AdminAuthWrapper(),
+      home: const SplashScreen(target: AdminAuthWrapper()),
     );
   }
 }

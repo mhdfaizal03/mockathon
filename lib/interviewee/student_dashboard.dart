@@ -85,7 +85,6 @@ class _DashboardContentState extends State<_DashboardContent> {
 
   bool _isUploading = false;
   late Stream<StudentModel> _studentStream;
-  late Stream<bool> _resultsPublishedStream;
   late Stream<MarkModel?> _marksStream;
   late Stream<List<NotificationModel>> _notificationStream;
 
@@ -93,7 +92,7 @@ class _DashboardContentState extends State<_DashboardContent> {
   void initState() {
     super.initState();
     _studentStream = _dataService.getStudent(widget.uid);
-    _resultsPublishedStream = _dataService.getResultsPublishedStream();
+    // _resultsPublishedStream will be handled inside build to ensure branch context
     _marksStream = _dataService.getMarks(widget.uid);
     _notificationStream = _dataService.getNotifications('interviewee');
   }
@@ -159,7 +158,7 @@ class _DashboardContentState extends State<_DashboardContent> {
 
                           _buildCVSection(context, student),
                           const SizedBox(height: 16),
-                          _buildMarksSection(widget.uid),
+                          _buildMarksSection(widget.uid, student.branch),
                         ],
                       );
                     },
@@ -318,15 +317,15 @@ class _DashboardContentState extends State<_DashboardContent> {
                         },
                       ),
                       _buildStat(
-                        Icons.calendar_today,
-                        "Role",
-                        "Candidate",
+                        Icons.location_on,
+                        "Branch",
+                        student.branch,
                         isMobile: isMobile,
                       ),
                       _buildStat(
                         Icons.school,
                         "Stack",
-                        "Tech",
+                        student.stack,
                         isMobile: isMobile,
                       ),
                     ],
@@ -341,9 +340,9 @@ class _DashboardContentState extends State<_DashboardContent> {
     );
   }
 
-  Widget _buildMarksSection(String uid) {
+  Widget _buildMarksSection(String uid, String branch) {
     return StreamBuilder<bool>(
-      stream: _resultsPublishedStream,
+      stream: _dataService.getResultsPublishedStream(branch: branch),
       builder: (context, settingSnap) {
         if (settingSnap.hasError) {
           return Center(

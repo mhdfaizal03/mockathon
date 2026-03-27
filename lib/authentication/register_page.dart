@@ -21,6 +21,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   String? _selectedStack;
   String? _selectedRemainStatus;
+  String? _selectedBranch;
   bool _isLoading = false;
 
   final List<String> _stackOptions = [
@@ -34,6 +35,12 @@ class _RegisterPageState extends State<RegisterPage> {
   ];
 
   final List<String> _remainStatusOptions = ['Main Project', 'Mini Project'];
+  final List<String> _branchOptions = [
+    'Kozhikode',
+    'Palakkad',
+    'Perinthalmanna',
+    'Kochi',
+  ];
 
   Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
@@ -46,6 +53,7 @@ class _RegisterPageState extends State<RegisterPage> {
           _nameController.text.trim(),
           _selectedStack!,
           _selectedRemainStatus!,
+          _selectedBranch!,
         );
 
         if (mounted) {
@@ -157,6 +165,15 @@ class _RegisterPageState extends State<RegisterPage> {
                     _stackOptions,
                     _selectedStack,
                     (val) => setState(() => _selectedStack = val),
+                  ),
+                  const SizedBox(height: 16),
+
+                  _buildDropdown(
+                    "Branch",
+                    Icons.location_on,
+                    _branchOptions,
+                    _selectedBranch,
+                    (val) => setState(() => _selectedBranch = val),
                   ),
                   const SizedBox(height: 16),
 

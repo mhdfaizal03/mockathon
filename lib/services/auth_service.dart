@@ -1,6 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mockathon/models/user_models.dart';
+import 'package:mockathon/firebase_options.dart';
 import 'dart:math';
 
 class AuthService {
@@ -43,9 +45,16 @@ class AuthService {
     String name,
     String stack,
     String remainStatus,
+    String branch,
   ) async {
+    // Use a secondary app to prevent the primary app's auth state from changing
+    FirebaseApp tempApp = await Firebase.initializeApp(
+      name: 'TempRegisterApp_${DateTime.now().millisecondsSinceEpoch}',
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     try {
-      UserCredential cred = await _auth.createUserWithEmailAndPassword(
+      FirebaseAuth tempAuth = FirebaseAuth.instanceFor(app: tempApp);
+      UserCredential cred = await tempAuth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -56,6 +65,7 @@ class AuthService {
           uid: cred.user!.uid,
           email: email,
           name: name,
+          branch: branch,
           stack: stack,
           remainStatus: remainStatus,
           randomId: randomId,
@@ -67,20 +77,26 @@ class AuthService {
             .doc(cred.user!.uid)
             .set(student.toMap());
       }
-    } catch (e) {
-      rethrow;
+    } finally {
+      await tempApp.delete();
     }
   }
 
-  // Register Interviewer/Admin (Helper for dev mostly, or separate admin flow)
+  // Register Interviewer/Admin
   Future<void> registerStaff(
     String email,
     String password,
     String name,
     UserRole role,
+    String branch,
   ) async {
+    FirebaseApp tempApp = await Firebase.initializeApp(
+      name: 'TempRegisterStaff_${DateTime.now().millisecondsSinceEpoch}',
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     try {
-      UserCredential cred = await _auth.createUserWithEmailAndPassword(
+      FirebaseAuth tempAuth = FirebaseAuth.instanceFor(app: tempApp);
+      UserCredential cred = await tempAuth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -90,6 +106,7 @@ class AuthService {
           uid: cred.user!.uid,
           email: email,
           name: name,
+          branch: branch,
           role: role,
         );
 
@@ -98,8 +115,8 @@ class AuthService {
             .doc(cred.user!.uid)
             .set(user.toMap());
       }
-    } catch (e) {
-      rethrow;
+    } finally {
+      await tempApp.delete();
     }
   }
 
