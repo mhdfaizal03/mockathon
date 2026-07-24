@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mockathon/core/theme.dart';
 import 'package:mockathon/authentication/login_page.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:mockathon/core/app_config.dart';
 
 class WelcomePage extends StatelessWidget {
   const WelcomePage({super.key});
@@ -33,7 +34,7 @@ class WelcomePage extends StatelessWidget {
                               .lightGradient, // Beautiful Indigo gradient
                           boxShadow: [
                             BoxShadow(
-                              color: theme.primaryColor.withOpacity(0.4),
+                              color: theme.primaryColor.withValues(alpha: 0.4),
                               blurRadius: 30,
                               spreadRadius: 5,
                               offset: const Offset(0, 10),
@@ -51,7 +52,7 @@ class WelcomePage extends StatelessWidget {
                     const SizedBox(height: 48),
 
                     Text(
-                      "MOCKATHON",
+                      AppConfigScope.of(context)?.appName.toUpperCase() ?? "MOCKATHON",
                       style: theme.textTheme.displayLarge!.copyWith(
                         letterSpacing: 4,
                         fontSize: 42,
@@ -61,7 +62,9 @@ class WelcomePage extends StatelessWidget {
                     Text(
                       "Test What You Are Capable Of",
                       style: theme.textTheme.bodyLarge!.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.6,
+                        ),
                       ),
                     ),
 
@@ -135,11 +138,11 @@ class WelcomePage extends StatelessWidget {
         height: 160,
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.grey.withOpacity(0.1)),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -151,7 +154,7 @@ class WelcomePage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 32),

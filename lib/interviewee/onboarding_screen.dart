@@ -27,7 +27,7 @@ class OnboardingScreen extends StatelessWidget {
                     padding: const EdgeInsets.all(24),
                     decoration: AppTheme.bentoDecoration(
                       color: AppTheme.bentoJacket,
-                      radius: 40,
+                      radius: 16,
                     ),
                     child: const Icon(
                       Icons.auto_awesome,
@@ -102,7 +102,7 @@ class OnboardingScreen extends StatelessWidget {
   Widget _buildGuidelinesCard() {
     return Container(
       padding: const EdgeInsets.all(32),
-      decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 40),
+      decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -153,7 +153,7 @@ class OnboardingScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.bentoJacket.withOpacity(0.1),
+              color: AppTheme.bentoJacket.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, size: 18, color: AppTheme.bentoJacket),

@@ -61,7 +61,7 @@ class ProfilePage extends StatelessWidget {
                         padding: EdgeInsets.all(isMobile ? 24 : 32),
                         decoration: AppTheme.bentoDecoration(
                           color: AppTheme.bentoJacket,
-                          radius: 40,
+                          radius: 16,
                         ),
                         child: Column(
                           children: [
@@ -74,7 +74,7 @@ class ProfilePage extends StatelessWidget {
                                 color: Colors.white,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
+                                    color: Colors.black.withValues(alpha: 0.2),
                                     blurRadius: 20,
                                     offset: const Offset(0, 10),
                                   ),
@@ -111,7 +111,7 @@ class ProfilePage extends StatelessWidget {
                                 vertical: 8,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.1),
+                                color: Colors.white.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
@@ -208,7 +208,7 @@ class ProfilePage extends StatelessWidget {
       height: isMobile ? 160 : 180,
       width: isMobile ? double.infinity : null,
       padding: const EdgeInsets.all(24),
-      decoration: AppTheme.bentoDecoration(color: bgColor, radius: 32),
+      decoration: AppTheme.bentoDecoration(color: bgColor, radius: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -222,7 +222,9 @@ class ProfilePage extends StatelessWidget {
                       label,
                       style: TextStyle(
                         fontSize: 14,
-                        color: (textColor ?? Colors.white).withOpacity(0.8),
+                        color: (textColor ?? Colors.white).withValues(
+                          alpha: 0.8,
+                        ),
                       ),
                     ),
                   ],
@@ -247,7 +249,7 @@ class ProfilePage extends StatelessWidget {
                   label,
                   style: TextStyle(
                     fontSize: 14,
-                    color: (textColor ?? Colors.white).withOpacity(0.8),
+                    color: (textColor ?? Colors.white).withValues(alpha: 0.8),
                   ),
                 ),
             ],
@@ -284,7 +286,7 @@ class ProfilePage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.bentoJacket.withOpacity(0.1),
+                  color: AppTheme.bentoJacket.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(

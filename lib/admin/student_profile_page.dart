@@ -5,14 +5,28 @@ import 'package:mockathon/services/data_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:mockathon/services/resume_service.dart';
 
-class StudentProfilePage extends StatelessWidget {
+class StudentProfilePage extends StatefulWidget {
   final StudentModel student;
 
   const StudentProfilePage({super.key, required this.student});
 
   @override
+  State<StudentProfilePage> createState() => _StudentProfilePageState();
+}
+
+class _StudentProfilePageState extends State<StudentProfilePage> {
+  String? _selectedMockathonId;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedMockathonId = widget.student.mockathonId;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final DataService dataService = DataService();
+    final student = widget.student;
 
     return Scaffold(
       backgroundColor: AppTheme.bentoBg,
@@ -62,7 +76,7 @@ class StudentProfilePage extends StatelessWidget {
                     padding: const EdgeInsets.all(24),
                     decoration: AppTheme.bentoDecoration(
                       color: AppTheme.bentoJacket,
-                      radius: 40,
+                      radius: 16,
                     ),
                     child: Column(
                       children: [
@@ -76,7 +90,7 @@ class StudentProfilePage extends StatelessWidget {
                                 color: Colors.white,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
+                                    color: Colors.black.withValues(alpha: 0.2),
                                     blurRadius: 20,
                                     offset: const Offset(0, 10),
                                   ),
@@ -197,6 +211,86 @@ class StudentProfilePage extends StatelessWidget {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Mockathon Session Selector
+                          StreamBuilder<List<MockathonModel>>(
+                            stream: dataService.getMockathons(
+                              branch: student.branch,
+                            ),
+                            builder: (context, mockathonSnap) {
+                              final mockathons = mockathonSnap.data ?? [];
+                              final List<String> sessionIds = [];
+                              final Map<String, String> sessionNames = {};
+
+                              for (var m in mockathons) {
+                                sessionIds.add(m.id);
+                                sessionNames[m.id] = "${m.name} (${m.id})";
+                              }
+
+                              if (student.mockathonId != null &&
+                                  !sessionIds.contains(student.mockathonId)) {
+                                sessionIds.insert(0, student.mockathonId!);
+                                sessionNames[student.mockathonId!] =
+                                    "Current Session (${student.mockathonId})";
+                              }
+
+                              if (sessionIds.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+
+                              _selectedMockathonId ??=
+                                  student.mockathonId ?? sessionIds.first;
+
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 24),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                decoration: AppTheme.bentoDecoration(
+                                  color: Colors.white,
+                                  radius: 20,
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.date_range,
+                                      color: AppTheme.bentoJacket,
+                                    ),
+                                    const SizedBox(width: 16),
+                                    const Text(
+                                      "Mockathon Session:",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: DropdownButtonHideUnderline(
+                                        child: DropdownButton<String>(
+                                          value: _selectedMockathonId,
+                                          items: sessionIds.map((id) {
+                                            return DropdownMenuItem(
+                                              value: id,
+                                              child: Text(
+                                                sessionNames[id] ?? id,
+                                              ),
+                                            );
+                                          }).toList(),
+                                          onChanged: (val) {
+                                            if (val != null) {
+                                              setState(() {
+                                                _selectedMockathonId = val;
+                                              });
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
                           if (!isPublished)
                             Container(
                               margin: const EdgeInsets.only(bottom: 24),
@@ -205,10 +299,10 @@ class StudentProfilePage extends StatelessWidget {
                                 vertical: 12,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.1),
+                                color: Colors.orange.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: Colors.orange.withOpacity(0.3),
+                                  color: Colors.orange.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(
@@ -231,7 +325,10 @@ class StudentProfilePage extends StatelessWidget {
                               ),
                             ),
                           StreamBuilder<MarkModel?>(
-                            stream: dataService.getMarks(student.uid),
+                            stream: dataService.getMarks(
+                              student.uid,
+                              mockathonId: _selectedMockathonId,
+                            ),
                             builder: (context, snapshot) {
                               if (snapshot.connectionState ==
                                   ConnectionState.waiting) {
@@ -334,7 +431,7 @@ class StudentProfilePage extends StatelessWidget {
                                       width: double.infinity,
                                       decoration: AppTheme.bentoDecoration(
                                         color: Colors.white,
-                                        radius: 32,
+                                        radius: 16,
                                       ),
                                       child: Column(
                                         crossAxisAlignment:
@@ -426,7 +523,7 @@ class StudentProfilePage extends StatelessWidget {
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 32),
+      decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -436,7 +533,7 @@ class StudentProfilePage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: accent.withOpacity(0.1),
+                  color: accent.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: accent, size: 28),

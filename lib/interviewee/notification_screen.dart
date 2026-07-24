@@ -42,7 +42,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
+                                  color: Colors.black.withValues(alpha: 0.05),
                                   blurRadius: 10,
                                 ),
                               ],
@@ -159,7 +159,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                     padding: EdgeInsets.all(isMobile ? 12 : 16),
                                     decoration: AppTheme.bentoDecoration(
                                       color: Colors.white,
-                                      radius: 24,
+                                      radius: 16,
                                     ),
                                     child: Row(
                                       crossAxisAlignment:
@@ -169,7 +169,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                           padding: const EdgeInsets.all(10),
                                           decoration: BoxDecoration(
                                             color: AppTheme.bentoJacket
-                                                .withOpacity(0.1),
+                                                .withValues(alpha: 0.1),
                                             shape: BoxShape.circle,
                                           ),
                                           child: const Icon(

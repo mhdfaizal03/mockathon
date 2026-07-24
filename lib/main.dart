@@ -12,6 +12,8 @@ import 'package:mockathon/interviewee/nav_screen.dart';
 import 'package:mockathon/interviewer/interviewer_nav_screen.dart';
 import 'package:mockathon/interviewee/onboarding_screen.dart';
 import 'package:mockathon/core/supabase_config.dart';
+import 'package:mockathon/core/app_config.dart';
+import 'package:mockathon/services/data_service.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
@@ -33,11 +35,20 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Mockathon',
-      theme: AppTheme.lightTheme,
-      home: const SplashScreen(),
+    return StreamBuilder<String>(
+      stream: DataService().getAppNameStream(),
+      builder: (context, snapshot) {
+        final appName = snapshot.data ?? 'Mockathon';
+        return AppConfigScope(
+          appName: appName,
+          child: MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: appName,
+            theme: AppTheme.lightTheme,
+            home: const SplashScreen(),
+          ),
+        );
+      },
     );
   }
 }

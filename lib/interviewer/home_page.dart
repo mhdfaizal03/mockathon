@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mockathon/core/theme.dart';
 import 'package:mockathon/models/user_models.dart';
@@ -25,6 +26,8 @@ class _HomePageState extends State<HomePage> {
   String _selectedStackFilter = 'All';
   String _selectedRemainStatusFilter = 'All';
   String _selectedBranchFilter = 'All';
+  String _selectedMockathonFilter =
+      'no_active_session'; // Default to no active session
 
   UserModel? _currentUserProfile;
 
@@ -45,6 +48,21 @@ class _HomePageState extends State<HomePage> {
     'Perinthalmanna',
     'Kochi',
   ];
+
+  StreamSubscription<String?>? _activeMockathonSubscription;
+
+  void _listenToActiveMockathon(String branch) {
+    _activeMockathonSubscription?.cancel();
+    _activeMockathonSubscription = _dataService
+        .getActiveMockathonIdStream(branch: branch)
+        .listen((activeId) {
+          if (mounted) {
+            setState(() {
+              _selectedMockathonFilter = activeId ?? 'no_active_session';
+            });
+          }
+        });
+  }
 
   @override
   void initState() {
@@ -68,12 +86,14 @@ class _HomePageState extends State<HomePage> {
             _selectedBranchFilter = profile.branch;
           }
         });
+        _listenToActiveMockathon(profile.branch);
       }
     }
   }
 
   @override
   void dispose() {
+    _activeMockathonSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -123,6 +143,7 @@ class _HomePageState extends State<HomePage> {
                   child: StreamBuilder<List<StudentModel>>(
                     stream: _dataService.getStudents(
                       branch: _selectedBranchFilter,
+                      mockathonId: _selectedMockathonFilter,
                     ),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {
@@ -165,6 +186,7 @@ class _HomePageState extends State<HomePage> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       // Filter Chips
+
                                       // Stack Filters
                                       Column(
                                         crossAxisAlignment:
@@ -254,11 +276,15 @@ class _HomePageState extends State<HomePage> {
                                                         branch,
                                                         _selectedBranchFilter ==
                                                             branch,
-                                                        () => setState(
-                                                          () =>
-                                                              _selectedBranchFilter =
-                                                                  branch,
-                                                        ),
+                                                        () {
+                                                          setState(() {
+                                                            _selectedBranchFilter =
+                                                                branch;
+                                                          });
+                                                          _listenToActiveMockathon(
+                                                            branch,
+                                                          );
+                                                        },
                                                       ),
                                                     ),
                                                   ),
@@ -327,7 +353,7 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: AppTheme.bentoJacket
-                                              .withOpacity(0.1),
+                                              .withValues(alpha: 0.1),
                                           borderRadius: BorderRadius.circular(
                                             12,
                                           ),
@@ -348,14 +374,53 @@ class _HomePageState extends State<HomePage> {
                               ),
 
                               if (students.isEmpty)
-                                const SliverToBoxAdapter(
+                                SliverToBoxAdapter(
                                   child: Padding(
-                                    padding: EdgeInsets.only(top: 40),
+                                    padding: const EdgeInsets.only(top: 40, left: 24, right: 24),
                                     child: Center(
-                                      child: Text(
-                                        "No candidates found",
-                                        style: TextStyle(color: Colors.grey),
-                                      ),
+                                      child: _selectedMockathonFilter == 'no_active_session'
+                                          ? Container(
+                                              padding: const EdgeInsets.all(24),
+                                              decoration: BoxDecoration(
+                                                color: Colors.amber.withValues(alpha: 0.1),
+                                                borderRadius: BorderRadius.circular(20),
+                                                border: Border.all(
+                                                  color: Colors.amber.withValues(alpha: 0.3),
+                                                ),
+                                              ),
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(
+                                                    Icons.warning_amber_rounded,
+                                                    color: Colors.amber,
+                                                    size: 48,
+                                                  ),
+                                                  const SizedBox(height: 16),
+                                                  Text(
+                                                    "No Active Session Set",
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Colors.amber[900],
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  const Text(
+                                                    "There is currently no active Mockathon session for this branch. Please contact an administrator to activate a session.",
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      color: Colors.black87,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          : const Text(
+                                              "No candidates found",
+                                              style: TextStyle(color: Colors.grey),
+                                            ),
                                     ),
                                   ),
                                 )
@@ -430,11 +495,11 @@ class _HomePageState extends State<HomePage> {
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(16),
         gradient: AppTheme.primaryGradient,
         boxShadow: [
           BoxShadow(
-            color: AppTheme.primaryPurple.withOpacity(0.3),
+            color: AppTheme.primaryPurple.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -473,8 +538,10 @@ class _HomePageState extends State<HomePage> {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.2),
-                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  color: Colors.white.withValues(alpha: 0.2),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: const Icon(Icons.logout, color: Colors.white),
               ),
@@ -540,7 +607,7 @@ class _HomePageState extends State<HomePage> {
           ),
         );
       },
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: AppTheme.modernDecoration(opacity: 1),
@@ -551,7 +618,7 @@ class _HomePageState extends State<HomePage> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: AppTheme.bentoJacket.withOpacity(0.1),
+                  color: AppTheme.bentoJacket.withValues(alpha: 0.1),
                   width: 2,
                 ),
               ),
@@ -590,7 +657,7 @@ class _HomePageState extends State<HomePage> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: AppTheme.bentoJacket.withOpacity(0.05),
+                      color: AppTheme.bentoJacket.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -613,7 +680,7 @@ class _HomePageState extends State<HomePage> {
                 Icon(
                   Icons.arrow_forward_ios_rounded,
                   size: 14,
-                  color: Colors.grey.withOpacity(0.5),
+                  color: Colors.grey.withValues(alpha: 0.5),
                 ),
                 const SizedBox(height: 8),
                 ConstrainedBox(
@@ -621,7 +688,7 @@ class _HomePageState extends State<HomePage> {
                   child: Text(
                     "#${student.randomId}",
                     style: TextStyle(
-                      color: Colors.grey.withOpacity(0.5),
+                      color: Colors.grey.withValues(alpha: 0.5),
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -649,7 +716,7 @@ class _HomePageState extends State<HomePage> {
           ),
         );
       },
-      borderRadius: BorderRadius.circular(32),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: AppTheme.modernDecoration(opacity: 1),
@@ -665,13 +732,13 @@ class _HomePageState extends State<HomePage> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: AppTheme.bentoJacket.withOpacity(0.1),
+                      color: AppTheme.bentoJacket.withValues(alpha: 0.1),
                       width: 2,
                     ),
                   ),
                   child: CircleAvatar(
                     backgroundColor: AppTheme.bentoBg,
-                    radius: 24,
+                    radius: 16,
                     child: Text(
                       student.name.isNotEmpty ? student.name[0] : '?',
                       style: const TextStyle(
@@ -721,7 +788,7 @@ class _HomePageState extends State<HomePage> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.bentoJacket.withOpacity(0.05),
+                    color: AppTheme.bentoJacket.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -738,7 +805,7 @@ class _HomePageState extends State<HomePage> {
                 Text(
                   "ID: ${student.randomId}",
                   style: TextStyle(
-                    color: Colors.grey.withOpacity(0.5),
+                    color: Colors.grey.withValues(alpha: 0.5),
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                   ),
@@ -767,12 +834,12 @@ class _HomePageState extends State<HomePage> {
           border: Border.all(
             color: isSelected
                 ? AppTheme.bentoJacket
-                : Colors.grey.withOpacity(0.3),
+                : Colors.grey.withValues(alpha: 0.3),
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppTheme.bentoJacket.withOpacity(0.3),
+                    color: AppTheme.bentoJacket.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),

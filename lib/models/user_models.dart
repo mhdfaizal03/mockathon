@@ -7,6 +7,7 @@ class UserModel {
   final String name;
   final String branch; // New property
   final bool hasCompletedOnboarding; // New flag
+  final String? mockathonId; // New property
 
   UserModel({
     required this.uid,
@@ -15,6 +16,7 @@ class UserModel {
     this.name = '',
     this.branch = 'Kozhikode', // Default for legacy users/staff
     this.hasCompletedOnboarding = true, // Default true for staff
+    this.mockathonId,
   });
 
   Map<String, dynamic> toMap() {
@@ -25,6 +27,7 @@ class UserModel {
       'name': name,
       'branch': branch,
       'hasCompletedOnboarding': hasCompletedOnboarding,
+      'mockathonId': mockathonId,
     };
   }
 
@@ -35,6 +38,7 @@ class UserModel {
       name: map['name'] ?? '',
       branch: (map['branch'] as String?)?.trim() ?? 'Kozhikode',
       hasCompletedOnboarding: map['hasCompletedOnboarding'] ?? true,
+      mockathonId: map['mockathonId'] as String?,
       role: UserRole.values.firstWhere(
         (e) => e.name == (map['role'] as String?)?.trim(),
         orElse: () => UserRole.interviewee,
@@ -49,6 +53,7 @@ class StudentModel extends UserModel {
   final String randomId;
   final List<String> notifications;
   final String? cvUrl;
+  final List<String> mockathonHistory;
 
   StudentModel({
     required super.uid,
@@ -61,6 +66,8 @@ class StudentModel extends UserModel {
     this.notifications = const [],
     this.cvUrl,
     super.hasCompletedOnboarding = false,
+    super.mockathonId,
+    this.mockathonHistory = const [],
   }) : super(role: UserRole.interviewee);
 
   @override
@@ -72,6 +79,7 @@ class StudentModel extends UserModel {
       'randomId': randomId,
       'notifications': notifications,
       'cvUrl': cvUrl,
+      'mockathonHistory': mockathonHistory,
     });
     return map;
   }
@@ -88,6 +96,8 @@ class StudentModel extends UserModel {
       notifications: List<String>.from(map['notifications'] ?? []),
       cvUrl: map['cvUrl'],
       hasCompletedOnboarding: map['hasCompletedOnboarding'] ?? false,
+      mockathonId: map['mockathonId'] as String?,
+      mockathonHistory: List<String>.from(map['mockathonHistory'] ?? []),
     );
   }
 }
@@ -195,6 +205,42 @@ class NotificationModel {
       type: map['type'] ?? 'info',
       minMarks: map['minMarks']?.toDouble(),
       branch: (map['branch'] as String?)?.trim() ?? 'All',
+    );
+  }
+}
+
+class MockathonModel {
+  final String id; // date string or unique code
+  final String name;
+  final DateTime date;
+  final bool isActive;
+  final String branch;
+
+  MockathonModel({
+    required this.id,
+    required this.name,
+    required this.date,
+    this.isActive = false,
+    this.branch = 'All',
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'date': date.toIso8601String(),
+      'isActive': isActive,
+      'branch': branch,
+    };
+  }
+
+  factory MockathonModel.fromMap(Map<String, dynamic> map) {
+    return MockathonModel(
+      id: map['id'] ?? '',
+      name: map['name'] ?? '',
+      date: DateTime.tryParse(map['date'] ?? '') ?? DateTime.now(),
+      isActive: map['isActive'] ?? false,
+      branch: map['branch'] ?? 'All',
     );
   }
 }

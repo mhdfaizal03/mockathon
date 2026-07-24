@@ -4,6 +4,7 @@ import 'package:mockathon/models/user_models.dart';
 import 'package:mockathon/services/auth_service.dart';
 import 'package:mockathon/services/data_service.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:mockathon/core/app_config.dart';
 
 import 'package:mockathon/interviewee/profile_page.dart';
 import 'package:mockathon/interviewee/notification_screen.dart';
@@ -100,74 +101,95 @@ class _DashboardContentState extends State<_DashboardContent> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.bentoBg,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1200),
-              child: Column(
-                children: [
-                  StreamBuilder<StudentModel>(
-                    stream: _studentStream,
-                    builder: (context, snapshot) {
-                      if (snapshot.hasError) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24.0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.error_outline,
-                                  color: Colors.red,
-                                  size: 48,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  "Error loading dashboard: ${snapshot.error}",
-                                  textAlign: TextAlign.center,
-                                ),
-                                TextButton(
-                                  onPressed: () => setState(() {}),
-                                  child: const Text("Retry"),
-                                ),
-                              ],
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: AppTheme.warmBackgroundGradient,
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Column(
+                  children: [
+                    StreamBuilder<StudentModel>(
+                      stream: _studentStream,
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline,
+                                    color: Colors.red,
+                                    size: 48,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    "Error loading dashboard: ${snapshot.error}",
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  TextButton(
+                                    onPressed: () => setState(() {}),
+                                    child: const Text("Retry"),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
+                          );
+                        }
+
+                        if (!snapshot.hasData) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+
+                        final student = snapshot.data!;
+
+                        return StreamBuilder<String?>(
+                          stream: _dataService.getActiveMockathonIdStream(branch: student.branch),
+                          builder: (context, activeMockathonSnap) {
+                            if (activeMockathonSnap.connectionState == ConnectionState.waiting) {
+                              return const Center(child: CircularProgressIndicator());
+                            }
+                            final activeMockathonId = activeMockathonSnap.data;
+
+                            return Column(
+                              children: [
+                                _buildHeader(context, student),
+                                const SizedBox(height: 12),
+                                _buildIDCard(student),
+                                const SizedBox(height: 16),
+                                
+                                if (student.mockathonId == null || activeMockathonId == null) ...[
+                                  _buildBeforeMockathonState(),
+                                ] else if (student.mockathonId != activeMockathonId) ...[
+                                  _buildAlreadyAttendedState(),
+                                  const SizedBox(height: 16),
+                                  _buildCVSection(context, student),
+                                  const SizedBox(height: 16),
+                                  _buildMarksSection(widget.uid, student.branch),
+                                ] else ...[
+                                  _buildCVSection(context, student),
+                                  const SizedBox(height: 16),
+                                  _buildMarksSection(widget.uid, student.branch),
+                                ],
+                                if (student.mockathonHistory.isNotEmpty) ...[
+                                  const SizedBox(height: 24),
+                                  _buildHistorySection(student),
+                                ],
+                              ],
+                            );
+                          },
                         );
-                      }
-
-                      if (!snapshot.hasData) {
-                        // Show skeleton/loading state while fetching profile
-                        return const Padding(
-                          padding: EdgeInsets.all(40.0),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
-
-                      final student = snapshot.data!;
-
-                      return Column(
-                        children: [
-                          _buildHeader(context, student),
-                          const SizedBox(height: 12),
-                          _buildIDCard(student),
-                          const SizedBox(height: 16),
-
-                          _buildCVSection(context, student),
-                          const SizedBox(height: 16),
-                          _buildMarksSection(widget.uid, student.branch),
-                        ],
-                      );
-                    },
-                  ),
-                  SafeArea(
-                    child: Image.asset('assets/softlogo.png', height: 80),
-                  ),
-                  const SizedBox(height: 80),
-                ],
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -340,6 +362,54 @@ class _DashboardContentState extends State<_DashboardContent> {
     );
   }
 
+  Widget _buildBeforeMockathonState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(32),
+      decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 30),
+      child: Column(
+        children: [
+          const Icon(Icons.event_available, size: 64, color: AppTheme.bentoJacket),
+          const SizedBox(height: 16),
+          Text(
+            "Before ${AppConfigScope.of(context)?.appName ?? 'Mockathon'}",
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "You are registered but not currently assigned to an active ${AppConfigScope.of(context)?.appName.toLowerCase() ?? 'mockathon'}.",
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.grey),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAlreadyAttendedState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(32),
+      decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 30),
+      child: Column(
+        children: [
+          const Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
+          const SizedBox(height: 16),
+          const Text(
+            "Already Attended",
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "You have already attended a ${AppConfigScope.of(context)?.appName.toLowerCase() ?? 'mockathon'}. Thank you for participating!",
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.grey),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMarksSection(String uid, String branch) {
     return StreamBuilder<bool>(
       stream: _dataService.getResultsPublishedStream(branch: branch),
@@ -415,18 +485,18 @@ class _DashboardContentState extends State<_DashboardContent> {
                 // Big card height = 2 * small + gap
                 final double bigHeight = (smallHeight * 2) + gap;
 
-                if (isTooNarrow) {
+                if (AppTheme.isMobile(context) || isTooNarrow) {
                   return Column(
                     children: [
-                      _buildAptitudeCard(marks, height: smallHeight),
+                      _buildAptitudeCard(marks),
                       SizedBox(height: gap),
-                      _buildTechnicalCard(marks, height: smallHeight),
+                      _buildTechnicalCard(marks),
                       SizedBox(height: gap),
-                      _buildMachineTestCard(marks, height: smallHeight),
+                      _buildMachineTestCard(marks),
                       SizedBox(height: gap),
-                      _buildGdCard(marks, height: smallHeight),
+                      _buildGdCard(marks),
                       SizedBox(height: gap),
-                      _buildHrCard(marks, height: smallHeight),
+                      _buildHrCard(marks),
                     ],
                   );
                 }
@@ -498,9 +568,10 @@ class _DashboardContentState extends State<_DashboardContent> {
     );
   }
 
-  Widget _buildAptitudeCard(MarkModel marks, {double height = 180}) {
+  Widget _buildAptitudeCard(MarkModel marks, {double? height}) {
     return Container(
-      height: height, // Dynamic height
+      height: height,
+      constraints: height == null ? const BoxConstraints(minHeight: 150) : null,
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 36),
@@ -552,9 +623,10 @@ class _DashboardContentState extends State<_DashboardContent> {
     ).animate().fade(duration: 600.ms).scale(curve: Curves.easeOutBack);
   }
 
-  Widget _buildTechnicalCard(MarkModel marks, {double height = 180}) {
+  Widget _buildTechnicalCard(MarkModel marks, {double? height}) {
     return Container(
           height: height,
+          constraints: height == null ? const BoxConstraints(minHeight: 150) : null,
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 36),
@@ -606,9 +678,10 @@ class _DashboardContentState extends State<_DashboardContent> {
         .slideX(begin: 0.2, end: 0);
   }
 
-  Widget _buildMachineTestCard(MarkModel marks, {double height = 180}) {
+  Widget _buildMachineTestCard(MarkModel marks, {double? height}) {
     return Container(
           height: height,
+          constraints: height == null ? const BoxConstraints(minHeight: 150) : null,
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 36),
@@ -660,9 +733,10 @@ class _DashboardContentState extends State<_DashboardContent> {
         .slideX(begin: 0.2, end: 0);
   }
 
-  Widget _buildHrCard(MarkModel marks, {double height = 180}) {
+  Widget _buildHrCard(MarkModel marks, {double? height}) {
     return Container(
           height: height,
+          constraints: height == null ? const BoxConstraints(minHeight: 150) : null,
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: AppTheme.bentoDecoration(
@@ -724,12 +798,13 @@ class _DashboardContentState extends State<_DashboardContent> {
         .slideX(begin: 0.2, end: 0);
   }
 
-  Widget _buildGdCard(MarkModel marks, {double height = 180}) {
+  Widget _buildGdCard(MarkModel marks, {double? height}) {
     return Container(
-          height: height,
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 36),
+      height: height,
+      constraints: height == null ? const BoxConstraints(minHeight: 150) : null,
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: AppTheme.bentoDecoration(color: Colors.white, radius: 36),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -998,5 +1073,125 @@ class _DashboardContentState extends State<_DashboardContent> {
         );
       }
     }
+  }
+
+  Widget _buildStatCard(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistorySection(StudentModel student) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: AppTheme.bentoDecoration(color: AppTheme.cardLight, radius: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Mockathon History",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+          ),
+          const SizedBox(height: 16),
+          ...student.mockathonHistory.map((historyId) {
+            return StreamBuilder<MarkModel?>(
+              stream: _dataService.getMarks(
+                student.uid,
+                mockathonId: historyId,
+              ),
+              builder: (context, marksSnap) {
+                if (marksSnap.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                
+                final marks = marksSnap.data;
+                
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: AppTheme.bentoDecoration(
+                    color: Colors.white,
+                    radius: 16,
+                    shadow: true,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Session ID: ${historyId.length > 8 ? historyId.substring(0, 8) : historyId}...",
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppTheme.bentoAccent.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              "Completed",
+                              style: TextStyle(color: AppTheme.bentoAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (marks != null) ...[
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            if (marks.aptitude > 0)
+                              _buildStatCard("Aptitude", "${marks.aptitude}", Colors.blue),
+                            if (marks.machineTest > 0)
+                              _buildStatCard("Machine", "${marks.machineTest}", Colors.orange),
+                            if (marks.technical > 0)
+                              _buildStatCard("Technical", "${marks.technical}", Colors.green),
+                            if (marks.gd > 0)
+                              _buildStatCard("GD", "${marks.gd}", Colors.purple),
+                            if (marks.hr > 0)
+                              _buildStatCard("HR", "${marks.hr}", Colors.red),
+                          ],
+                        ),
+                        if (marks.hrFeedback.isNotEmpty || marks.technicalFeedback.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          const Text("Feedback:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          const SizedBox(height: 4),
+                          if (marks.hrFeedback.isNotEmpty)
+                            Text("HR: ${marks.hrFeedback}", style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                          if (marks.technicalFeedback.isNotEmpty)
+                            Text("Technical: ${marks.technicalFeedback}", style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                        ],
+                      ] else ...[
+                        const SizedBox(height: 8),
+                        const Text("No marks recorded for this session.", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      ]
+                    ],
+                  ),
+                );
+              },
+            );
+          }),
+        ],
+      ),
+    );
   }
 }

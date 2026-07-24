@@ -18,7 +18,7 @@ class _SplashScreenState extends State<SplashScreen> {
     _navigateToHome();
   }
 
-  _navigateToHome() async {
+  Future<void> _navigateToHome() async {
     await Future.delayed(const Duration(seconds: 3));
     if (!mounted) return;
     Navigator.pushReplacement(
@@ -52,7 +52,7 @@ class _SplashScreenState extends State<SplashScreen> {
                           BoxShadow(
                             color: Theme.of(
                               context,
-                            ).primaryColor.withOpacity(0.3),
+                            ).primaryColor.withValues(alpha: 0.3),
                             blurRadius: 30,
                             spreadRadius: 5,
                             offset: const Offset(0, 10),

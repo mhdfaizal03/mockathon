@@ -2,40 +2,44 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
+  // Responsive Helpers
+  static bool isMobile(BuildContext context) => MediaQuery.of(context).size.width < 600;
+  static bool isTablet(BuildContext context) => MediaQuery.of(context).size.width >= 600 && MediaQuery.of(context).size.width < 1024;
+  static bool isDesktop(BuildContext context) => MediaQuery.of(context).size.width >= 1024;
+
   // Colors - Dark
-  static const Color bgDark = Color(0xFF0F172A); // Dark Slate Blue
-  static const Color cardDark = Color(0xFF1E293B); // Lighter Slate
-  static const Color primaryPurple = Color(0xFF6366F1); // Indigo 500
-  static const Color primaryOrange = Color(0xFFF97316);
-  static const Color textWhite = Color(0xFFF8FAFC);
-  static const Color textGrey = Color(0xFF94A3B8);
+  static const Color bgDark = Color(0xFF1E1F21); // Warm Dark Charcoal
+  static const Color cardDark = Color(0xFF28292B); // Lighter Warm Charcoal
+  static const Color primaryPurple = Color(0xFFF9BA15); // Golden Honey Yellow
+  static const Color primaryOrange = Color(0xFFD3A13B); // Warm Gold
+  static const Color textWhite = Color(0xFFFAF9F6);
+  static const Color textGrey = Color(0xFF9E9A90);
 
   // Colors - Light (Professional)
-  static const Color softWhite = Color(0xFFF9FAFB); // Soft Off-White
-  static const Color bgLight = Color(0xFFF1F5F9); // Slightly Darker Slate
+  static const Color softWhite = Color(0xFFFFFFFF); // Pure White for Cards
+  static const Color bgLight = Color(0xFFF6F3EB); // Warm Sand Beige
   static const Color cardLight = softWhite;
-  static const Color primaryIndigo = Color(0xFF4338CA); // Indigo 700
-  static const Color textBlack = Color(0xFF1E293B); // Slate 800
-  static const Color textLightGrey = Color(0xFF64748B); // Slate 500
+  static const Color primaryIndigo = Color(0xFF28292B); // Rich Charcoal Primary
+  static const Color textBlack = Color(0xFF1F1F1F); // Very Dark Charcoal (Not Pure Black)
+  static const Color textLightGrey = Color(0xFF7A756C); // Warm Charcoal Grey
 
   // Colors - Bento UI
-  static const Color bentoBg = Color(
-    0xFFE2E8F0,
-  ); // Darker Grey/Slate Background
-  static const Color bentoJacket = Color(
-    0xFF3A4155,
-  ); // Dark Slate (Weather Card)
-  static const Color bentoAccent = Color(
-    0xFFDAC09B,
-  ); // Beige/Wheat (Temperature Card)
-  static const Color bentoSurface = softWhite; // Standard Cards
+  static const Color bentoBg = Color(0xFFF6F3EB); // Scaffold background (Sand Beige)
+  static const Color bentoJacket = Color(0xFF28292B); // Active sidebar background (Rich Charcoal)
+  static const Color bentoAccent = Color(0xFFF9BA15); // Active accent/gold
+  static const Color bentoSurface = softWhite; // Standard Card surfaces
 
   static ThemeData get darkTheme {
+    final outfitFont = GoogleFonts.outfit();
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       scaffoldBackgroundColor: bgDark,
       primaryColor: primaryPurple,
+      fontFamily: outfitFont.fontFamily,
+      splashFactory: NoSplash.splashFactory,
+      highlightColor: Colors.transparent,
+      hoverColor: Colors.transparent,
       colorScheme: const ColorScheme.dark(
         primary: primaryPurple,
         secondary: primaryOrange,
@@ -53,19 +57,36 @@ class AppTheme {
           fontWeight: FontWeight.bold,
           fontSize: 24,
         ),
+        displaySmall: GoogleFonts.outfit(
+          color: textWhite,
+          fontWeight: FontWeight.bold,
+          fontSize: 20,
+        ),
+        headlineMedium: GoogleFonts.outfit(
+          color: textWhite,
+          fontWeight: FontWeight.w600,
+          fontSize: 18,
+        ),
+        titleLarge: GoogleFonts.outfit(
+          color: textWhite,
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+        ),
         bodyLarge: GoogleFonts.inter(color: textWhite, fontSize: 16),
-        bodyMedium: GoogleFonts.inter(color: textGrey, fontSize: 14),
+        bodyMedium: GoogleFonts.inter(color: textWhite, fontSize: 14),
+        bodySmall: GoogleFonts.inter(color: textGrey, fontSize: 12),
+        labelLarge: GoogleFonts.inter(color: textWhite, fontWeight: FontWeight.w500, fontSize: 14),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: cardDark.withOpacity(0.5),
+        fillColor: cardDark.withValues(alpha: 0.5),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: textGrey.withOpacity(0.2)),
+          borderSide: BorderSide(color: textGrey.withValues(alpha: 0.2)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: textGrey.withOpacity(0.2)),
+          borderSide: BorderSide(color: textGrey.withValues(alpha: 0.2)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -76,7 +97,7 @@ class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryPurple,
-          foregroundColor: Colors.white,
+          foregroundColor: const Color(0xFF28292B), // dark text on gold button
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
           ),
@@ -98,11 +119,16 @@ class AppTheme {
   }
 
   static ThemeData get lightTheme {
+    final outfitFont = GoogleFonts.outfit();
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       scaffoldBackgroundColor: bgLight,
       primaryColor: primaryIndigo,
+      fontFamily: outfitFont.fontFamily,
+      splashFactory: NoSplash.splashFactory,
+      highlightColor: Colors.transparent,
+      hoverColor: Colors.transparent,
       colorScheme: const ColorScheme.light(
         primary: primaryIndigo,
         secondary: primaryOrange,
@@ -130,19 +156,36 @@ class AppTheme {
           fontWeight: FontWeight.bold,
           fontSize: 24,
         ),
+        displaySmall: GoogleFonts.outfit(
+          color: textBlack,
+          fontWeight: FontWeight.bold,
+          fontSize: 20,
+        ),
+        headlineMedium: GoogleFonts.outfit(
+          color: textBlack,
+          fontWeight: FontWeight.w600,
+          fontSize: 18,
+        ),
+        titleLarge: GoogleFonts.outfit(
+          color: textBlack,
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+        ),
         bodyLarge: GoogleFonts.inter(color: textBlack, fontSize: 16),
-        bodyMedium: GoogleFonts.inter(color: textLightGrey, fontSize: 14),
+        bodyMedium: GoogleFonts.inter(color: textBlack, fontSize: 14),
+        bodySmall: GoogleFonts.inter(color: textLightGrey, fontSize: 12),
+        labelLarge: GoogleFonts.inter(color: textBlack, fontWeight: FontWeight.w500, fontSize: 14),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: textLightGrey.withOpacity(0.3)),
+          borderSide: BorderSide(color: textLightGrey.withValues(alpha: 0.3)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: textLightGrey.withOpacity(0.3)),
+          borderSide: BorderSide(color: textLightGrey.withValues(alpha: 0.3)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -156,7 +199,7 @@ class AppTheme {
           backgroundColor: primaryIndigo,
           foregroundColor: Colors.white,
           elevation: 2,
-          shadowColor: primaryIndigo.withOpacity(0.3),
+          shadowColor: primaryIndigo.withValues(alpha: 0.3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
           ),
@@ -177,7 +220,6 @@ class AppTheme {
     );
   }
 
-  // Linear Gradient
   static const LinearGradient primaryGradient = LinearGradient(
     colors: [primaryPurple, primaryOrange],
     begin: Alignment.topLeft,
@@ -185,37 +227,47 @@ class AppTheme {
   );
 
   static const LinearGradient lightGradient = LinearGradient(
-    colors: [primaryIndigo, Color(0xFF6366F1)], // Indigo 700 to Indigo 500
+    colors: [primaryIndigo, Color(0xFF424447)], // Charcoal to Lighter Charcoal
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
+  );
+
+  // Warm Sand Background Gradient
+  static const LinearGradient warmBackgroundGradient = LinearGradient(
+    colors: [
+      Color(0xFFF4F1EA), // Bottom-left warm beige
+      Color(0xFFFFF9E6), // Top-right soft golden glow
+    ],
+    begin: Alignment.bottomLeft,
+    end: Alignment.topRight,
   );
 
   // Glassmorphic / Modern Card Decoration (Light)
   static BoxDecoration modernDecoration({double opacity = 1.0}) {
     return BoxDecoration(
-      color: Colors.white.withOpacity(opacity),
-      borderRadius: BorderRadius.circular(15),
+      color: Colors.white.withValues(alpha: opacity),
+      borderRadius: BorderRadius.circular(20), // Unified 20px radius
       boxShadow: [
         BoxShadow(
-          color: const Color(0xFF64748B).withOpacity(0.1), // Slate shadow
+          color: const Color(0xFF5C5543).withValues(alpha: 0.06), // warm sand shadow
           blurRadius: 20,
           offset: const Offset(0, 10),
           spreadRadius: 0,
         ),
       ],
-      border: Border.all(color: Colors.white),
+      border: Border.all(color: const Color(0xFFEBE6DD)),
     );
   }
 
   // Glassmorphic Decoration (Legacy Dark)
   static BoxDecoration glassDecoration({double opacity = 0.1}) {
     return BoxDecoration(
-      color: Colors.white.withOpacity(opacity),
-      borderRadius: BorderRadius.circular(15),
-      border: Border.all(color: Colors.white.withOpacity(0.1)),
+      color: Colors.white.withValues(alpha: opacity),
+      borderRadius: BorderRadius.circular(20), // Unified 20px radius
+      border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withOpacity(0.2),
+          color: Colors.black.withValues(alpha: 0.2),
           blurRadius: 16,
           offset: const Offset(0, 8),
         ),
@@ -226,26 +278,23 @@ class AppTheme {
   // Bento Decoration
   static BoxDecoration bentoDecoration({
     required Color color,
-    double radius = 32,
+    double radius = 12, // Default changed to 12 for web feel
     bool shadow = false,
   }) {
     return BoxDecoration(
       color: color,
       borderRadius: BorderRadius.circular(radius),
-      border: Border.all(color: Colors.black.withOpacity(0.05)),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.04),
-          blurRadius: 8,
-          offset: const Offset(0, 4),
-        ),
-        if (shadow)
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-      ],
+      border: Border.all(color: const Color(0xFFE5E5E5)),
+      boxShadow: shadow
+          ? [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ]
+          : [],
     );
   }
 }
+

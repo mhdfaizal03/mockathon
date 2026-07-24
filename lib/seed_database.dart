@@ -75,7 +75,7 @@ void main() async {
           'email': email,
           'role': role,
           'branch': branch,
-          'name': '${branch} ${role.toUpperCase()}',
+          'name': '$branch ${role.toUpperCase()}',
           'createdAt': FieldValue.serverTimestamp(),
         });
         print('Created $role for $branch ($email)');

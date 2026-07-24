@@ -35,7 +35,7 @@ class _NavScreenState extends State<NavScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: AppTheme.bentoDecoration(
                 color: AppTheme.cardLight,
-                radius: 40,
+                radius: 16,
                 shadow: true,
               ),
               child: Row(

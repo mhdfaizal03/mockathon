@@ -171,14 +171,14 @@ class _MarkFormState extends State<MarkForm> {
                 padding: const EdgeInsets.all(16),
                 decoration: AppTheme.bentoDecoration(
                   color: Colors.white,
-                  radius: 32,
+                  radius: 16,
                 ),
                 child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryIndigo.withOpacity(0.1),
+                        color: AppTheme.primaryIndigo.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -219,7 +219,7 @@ class _MarkFormState extends State<MarkForm> {
                 padding: const EdgeInsets.all(20),
                 decoration: AppTheme.bentoDecoration(
                   color: Colors.white,
-                  radius: 32,
+                  radius: 16,
                 ),
                 child: Form(
                   key: _formKey,

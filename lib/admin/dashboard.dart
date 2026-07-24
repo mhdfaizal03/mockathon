@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:mockathon/core/theme.dart';
 import 'package:mockathon/services/auth_service.dart';
 import 'package:mockathon/services/resume_service.dart';
@@ -12,6 +13,8 @@ import 'package:mockathon/admin/student_profile_page.dart';
 import 'package:mockathon/authentication/login_page.dart';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:mockathon/core/app_config.dart';
+import 'package:mockathon/admin/screens/settings_screen.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io' show Platform, File;
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -24,6 +27,7 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final DataService _dataService = DataService();
   final AuthService _authService = AuthService();
   static int _selectedIndex = 0;
@@ -37,6 +41,8 @@ class _DashboardState extends State<Dashboard> {
     "Broadcast",
     "Publish",
     "Reports",
+    "Mockathons",
+    "Settings",
   ];
 
   final List<IconData> _icons = [
@@ -47,6 +53,8 @@ class _DashboardState extends State<Dashboard> {
     Icons.campaign_rounded,
     Icons.publish_rounded,
     Icons.assessment_rounded,
+    Icons.date_range_rounded,
+    Icons.settings_rounded,
   ];
 
   // Filtering
@@ -55,6 +63,7 @@ class _DashboardState extends State<Dashboard> {
   String _selectedMarkFilter = 'All'; // New Mark Filter
   String _searchQuery = ''; // New Search Query
   String _selectedBranchFilter = 'All'; // New Branch Filter
+  String _selectedMockathonFilter = 'All'; // New Mockathon Session Filter
   String _selectedSortOption = 'Name A-Z';
   final List<String> _sortOptions = [
     'Name A-Z',
@@ -63,6 +72,81 @@ class _DashboardState extends State<Dashboard> {
     'Marks Low-High',
   ];
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _mockathonNameController = TextEditingController();
+  DateTime? _selectedMockathonDate;
+  StreamSubscription<String?>? _activeMockathonSubscription;
+
+  void _listenToActiveMockathon(String branch) {
+    _activeMockathonSubscription?.cancel();
+    _activeMockathonSubscription = _dataService
+        .getActiveMockathonIdStream(branch: branch)
+        .listen((activeId) {
+      if (mounted) {
+        setState(() {
+          _selectedMockathonFilter = activeId ?? 'All';
+        });
+      }
+    });
+  }
+
+  void _updateBranchFilter(String val) {
+    setState(() {
+      _selectedBranchFilter = val;
+    });
+    _listenToActiveMockathon(val);
+  }
+
+  Widget _buildMockathonFilterDropdown({String? branch}) {
+    final activeBranch = branch ?? _selectedBranchFilter;
+    return StreamBuilder<List<MockathonModel>>(
+      stream: _dataService.getMockathons(branch: activeBranch),
+      builder: (context, snapshot) {
+        final mockathons = snapshot.data ?? [];
+        final items = <DropdownMenuItem<String>>[
+          const DropdownMenuItem(value: 'All', child: Text("All Sessions")),
+        ];
+        for (var m in mockathons) {
+          items.add(DropdownMenuItem(value: m.id, child: Text(m.name)));
+        }
+
+        final currentVal = items.any((i) => i.value == _selectedMockathonFilter)
+            ? _selectedMockathonFilter
+            : 'All';
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.date_range, size: 16, color: AppTheme.bentoJacket),
+              const SizedBox(width: 8),
+              DropdownButton<String>(
+                value: currentVal,
+                underline: const SizedBox(),
+                isDense: true,
+                items: items,
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _selectedMockathonFilter = val);
+                  }
+                },
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   void initState() {
@@ -81,6 +165,7 @@ class _DashboardState extends State<Dashboard> {
             _selectedBranchFilter = profile.branch;
           }
         });
+        _listenToActiveMockathon(_selectedBranchFilter);
       }
     }
   }
@@ -88,6 +173,8 @@ class _DashboardState extends State<Dashboard> {
   @override
   void dispose() {
     _searchController.dispose();
+    _mockathonNameController.dispose();
+    _activeMockathonSubscription?.cancel();
     super.dispose();
   }
 
@@ -130,9 +217,15 @@ class _DashboardState extends State<Dashboard> {
   ];
 
   Future<void> _downloadCsv() async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
-      final students = await _dataService.getStudents().first;
-      final marksMap = await _dataService.getAllMarksStream().first;
+      final students = await _dataService.getStudents(
+        branch: _reportBranchFilter != 'All' ? _reportBranchFilter : null,
+        mockathonId: _selectedMockathonFilter != 'All' ? _selectedMockathonFilter : null,
+      ).first;
+      final marksMap = await _dataService.getAllMarksStream(
+        mockathonId: _selectedMockathonFilter != 'All' ? _selectedMockathonFilter : null,
+      ).first;
 
       List<List<dynamic>> rows = [
         [
@@ -326,29 +419,23 @@ class _DashboardState extends State<Dashboard> {
         final directory = await getApplicationDocumentsDirectory();
         final file = File('${directory.path}/candidates_marks.csv');
         await file.writeAsString(csv);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text("Saved to ${file.path}")));
+        messenger.showSnackBar(SnackBar(content: Text("Saved to ${file.path}")));
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("CSV Export Successful"),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text("CSV Export Successful"),
+          backgroundColor: Colors.green,
+        ),
+      );
     } catch (e) {
       debugPrint("Export Error: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error downloading CSV: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text("Error downloading CSV: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -398,10 +485,13 @@ class _DashboardState extends State<Dashboard> {
       _buildBroadcastScreen(theme),
       _buildPublishScreen(theme),
       _buildReportsScreen(theme),
+      _buildMockathonsScreen(theme),
+      const SettingsScreen(),
     ];
 
     return Scaffold(
-      backgroundColor: AppTheme.bentoBg, // Bento Background
+      backgroundColor: AppTheme.bentoBg, // Using the suggested white/sand theme
+      key: _scaffoldKey,
       body: SafeArea(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -524,19 +614,20 @@ class _DashboardState extends State<Dashboard> {
 
   Widget _buildSideNav(ThemeData theme) {
     return Container(
-      width: 250,
-      margin: const EdgeInsets.only(left: 12, top: 12, bottom: 12),
-      padding: const EdgeInsets.all(16),
+      width: 260,
+      margin: const EdgeInsets.only(left: 16, top: 16, bottom: 16, right: 8),
+      padding: const EdgeInsets.all(24),
       decoration: AppTheme.bentoDecoration(
-        color: AppTheme.cardLight,
-        radius: 32,
+        color: Colors.white,
+        radius: 20,
+        shadow: true,
       ),
       child: Column(
         children: [
           const SizedBox(height: 20),
-          const Text(
-            "MOCKATHON",
-            style: TextStyle(
+          Text(
+            AppConfigScope.of(context)?.appName.toUpperCase() ?? "MOCKATHON",
+            style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
               letterSpacing: 2,
@@ -544,11 +635,18 @@ class _DashboardState extends State<Dashboard> {
             ),
           ),
           const SizedBox(height: 24),
-          for (int i = 0; i < _labels.length; i++) ...[
-            _navItem(i, _icons[i], _labels[i], theme),
-            const SizedBox(height: 12),
-          ],
-          const Spacer(),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  for (int i = 0; i < _labels.length; i++) ...[
+                    _navItem(i, _icons[i], _labels[i], theme),
+                    const SizedBox(height: 12),
+                  ],
+                ],
+              ),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.only(bottom: 24),
             child: Image.asset('assets/softlogo.png', height: 100),
@@ -573,12 +671,18 @@ class _DashboardState extends State<Dashboard> {
                 fit: BoxFit.contain,
               ),
               const SizedBox(height: 24),
-
-              for (int i = 0; i < _labels.length; i++) ...[
-                _navItem(i, _icons[i], _labels[i], theme),
-                const SizedBox(height: 12),
-              ],
-              const Spacer(),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      for (int i = 0; i < _labels.length; i++) ...[
+                        _navItem(i, _icons[i], _labels[i], theme),
+                        const SizedBox(height: 12),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 12),
             ],
           ),
@@ -598,25 +702,26 @@ class _DashboardState extends State<Dashboard> {
         }
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: AppTheme.bentoDecoration(
-          color: isSelected ? AppTheme.bentoJacket : Colors.transparent,
-          radius: 24,
+        decoration: BoxDecoration(
+          color: isSelected ? AppTheme.bentoAccent.withValues(alpha: 0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
         ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, color: isSelected ? Colors.white : Colors.grey),
-            const SizedBox(width: 16),
-            Flexible(
+            Icon(icon, 
+              color: isSelected ? AppTheme.bentoAccent : const Color(0xFF757575),
+              size: 22
+            ),
+            const SizedBox(width: 12),
+            Expanded(
               child: Text(
                 title,
                 style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.grey[700],
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  color: isSelected ? AppTheme.bentoAccent : const Color(0xFF424242),
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  fontSize: 14,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -667,8 +772,10 @@ class _DashboardState extends State<Dashboard> {
                     "Branch",
                     _selectedBranchFilter,
                     ['All', ..._branchOptions],
-                    (val) => setState(() => _selectedBranchFilter = val),
+                    (val) => _updateBranchFilter(val),
                   ),
+                  const SizedBox(width: 12),
+                  _buildMockathonFilterDropdown(),
                   const SizedBox(width: 12),
                   // Sorting Chip
                   Container(
@@ -679,7 +786,7 @@ class _DashboardState extends State<Dashboard> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                      border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -699,8 +806,9 @@ class _DashboardState extends State<Dashboard> {
                             return DropdownMenuItem(value: e, child: Text(e));
                           }).toList(),
                           onChanged: (val) {
-                            if (val != null)
+                            if (val != null) {
                               setState(() => _selectedSortOption = val);
+                            }
                           },
                         ),
                       ],
@@ -714,12 +822,21 @@ class _DashboardState extends State<Dashboard> {
         const SizedBox(height: 15),
         // Grid of Bento Stats
         StreamBuilder<Map<String, MarkModel>>(
-          stream: _dataService.getAllMarksStream(),
+          stream: _dataService.getAllMarksStream(
+            mockathonId: _selectedMockathonFilter != 'All'
+                ? _selectedMockathonFilter
+                : null,
+          ),
           builder: (context, markSnapshot) {
             final marksMap = markSnapshot.data ?? {};
 
             return StreamBuilder<List<StudentModel>>(
-              stream: _dataService.getStudents(branch: _selectedBranchFilter),
+              stream: _dataService.getStudents(
+                branch: _selectedBranchFilter,
+                mockathonId: _selectedMockathonFilter != 'All'
+                    ? _selectedMockathonFilter
+                    : null,
+              ),
               builder: (context, snapshot) {
                 final allStudents = snapshot.data ?? [];
                 final filtered = allStudents.where((s) {
@@ -775,6 +892,13 @@ class _DashboardState extends State<Dashboard> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 12),
+                        _bentoStatCard(
+                          "Sessions",
+                          "Active",
+                          AppTheme.bentoSurface,
+                          Colors.black87,
+                        ),
                       ] else ...[
                         Expanded(
                           child: _bentoStatCard(
@@ -806,7 +930,10 @@ class _DashboardState extends State<Dashboard> {
                     ];
 
                     if (isNarrow) {
-                      return Column(children: cards);
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: cards,
+                      );
                     } else {
                       return Row(children: cards);
                     }
@@ -834,13 +961,20 @@ class _DashboardState extends State<Dashboard> {
               ),
               const SizedBox(height: 16),
               StreamBuilder<Map<String, MarkModel>>(
-                stream: _dataService.getAllMarksStream(),
+                stream: _dataService.getAllMarksStream(
+                  mockathonId: _selectedMockathonFilter != 'All'
+                      ? _selectedMockathonFilter
+                      : null,
+                ),
                 builder: (context, markSnap) {
                   final marksMap = markSnap.data ?? {};
 
                   return StreamBuilder<List<StudentModel>>(
                     stream: _dataService.getStudents(
                       branch: _selectedBranchFilter,
+                      mockathonId: _selectedMockathonFilter != 'All'
+                          ? _selectedMockathonFilter
+                          : null,
                     ),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
@@ -1027,10 +1161,16 @@ class _DashboardState extends State<Dashboard> {
   Widget _bentoStatCard(String label, String value, Color bg, Color text) {
     final isMobile = MediaQuery.of(context).size.width < 600;
     return Container(
-      padding: EdgeInsets.all(isMobile ? 12 : 16),
+      height: isMobile ? 80 : 96,
+      alignment: Alignment.centerLeft,
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 12 : 16,
+        vertical: isMobile ? 8 : 12,
+      ),
       decoration: AppTheme.bentoDecoration(color: bg, radius: 28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             value,
@@ -1038,9 +1178,17 @@ class _DashboardState extends State<Dashboard> {
               fontSize: isMobile ? 22 : 28,
               fontWeight: FontWeight.bold,
               color: text,
+              height: 1.1,
             ),
           ),
-          Text(label, style: TextStyle(color: text.withValues(alpha: 0.7))),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              color: text.withValues(alpha: 0.7),
+              fontSize: isMobile ? 12 : 14,
+            ),
+          ),
         ],
       ),
     );
@@ -1088,8 +1236,9 @@ class _DashboardState extends State<Dashboard> {
                   MediaQuery.of(context).size.width < 600 ? 12 : 16,
                 ),
                 decoration: AppTheme.bentoDecoration(
-                  color: AppTheme.bentoAccent,
-                  radius: 32,
+                  color: Colors.white,
+                  radius: 24,
+                  shadow: true,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1107,12 +1256,12 @@ class _DashboardState extends State<Dashboard> {
                             ? 20
                             : 24,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: Colors.black87,
                       ),
                     ),
                     const Text(
                       "Management",
-                      style: const TextStyle(color: Colors.white70),
+                      style: TextStyle(color: Colors.grey),
                     ),
                   ],
                 ),
@@ -1130,10 +1279,11 @@ class _DashboardState extends State<Dashboard> {
                     Container(
                           padding: const EdgeInsets.all(24),
                           decoration: AppTheme.bentoDecoration(
-                            color: AppTheme.bentoSurface,
-                            radius: 32,
+                            color: AppTheme.bentoAccent,
+                            radius: 20,
+                            shadow: true,
                           ),
-                          child: const Icon(Icons.add, size: 32),
+                          child: const Icon(Icons.add, size: 28, color: Colors.white),
                         )
                         .animate()
                         .fade(delay: 200.ms)
@@ -1159,10 +1309,12 @@ class _DashboardState extends State<Dashboard> {
                     "Branch",
                     _selectedBranchFilter,
                     ['All', ..._branchOptions],
-                    (val) => setState(() => _selectedBranchFilter = val),
+                    (val) => _updateBranchFilter(val),
                   ),
                   const SizedBox(width: 5),
                   if (role == 'interviewee') ...[
+                    _buildMockathonFilterDropdown(),
+                    const SizedBox(width: 5),
                     _buildFilterChip(
                       "Stack",
                       _selectedStackFilter,
@@ -1194,7 +1346,7 @@ class _DashboardState extends State<Dashboard> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1214,8 +1366,9 @@ class _DashboardState extends State<Dashboard> {
                               return DropdownMenuItem(value: e, child: Text(e));
                             }).toList(),
                             onChanged: (val) {
-                              if (val != null)
+                              if (val != null) {
                                 setState(() => _selectedSortOption = val);
+                              }
                             },
                           ),
                         ],
@@ -1235,7 +1388,11 @@ class _DashboardState extends State<Dashboard> {
             radius: 32,
           ),
           child: StreamBuilder<Map<String, MarkModel>>(
-            stream: _dataService.getAllMarksStream(), // Need marks for filter
+            stream: _dataService.getAllMarksStream(
+              mockathonId: _selectedMockathonFilter != 'All'
+                  ? _selectedMockathonFilter
+                  : null,
+            ), // Need marks for filter
             builder: (context, markSnap) {
               final marksMap = markSnap.data ?? {};
 
@@ -1243,6 +1400,9 @@ class _DashboardState extends State<Dashboard> {
                 stream: _dataService.getUsersByRole(
                   role,
                   branch: _selectedBranchFilter,
+                  mockathonId: role == 'interviewee' && _selectedMockathonFilter != 'All'
+                      ? _selectedMockathonFilter
+                      : null,
                 ),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -1281,10 +1441,12 @@ class _DashboardState extends State<Dashboard> {
                               m.hr > 0 ||
                               m.technical > 0 ||
                               m.machineTest > 0);
-                      if (_selectedMarkFilter == 'Marked' && !hasMarks)
+                      if (_selectedMarkFilter == 'Marked' && !hasMarks) {
                         return false;
-                      if (_selectedMarkFilter == 'Unmarked' && hasMarks)
+                      }
+                      if (_selectedMarkFilter == 'Unmarked' && hasMarks) {
                         return false;
+                      }
                     }
 
                     return true;
@@ -1600,7 +1762,7 @@ class _DashboardState extends State<Dashboard> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: stackController.text.isNotEmpty
+                  initialValue: stackController.text.isNotEmpty
                       ? stackController.text
                       : null,
                   decoration: InputDecoration(
@@ -1637,7 +1799,7 @@ class _DashboardState extends State<Dashboard> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: selectedStatus,
+                  initialValue: selectedStatus,
                   decoration: InputDecoration(
                     labelText: "Status",
                     filled: true,
@@ -1656,7 +1818,7 @@ class _DashboardState extends State<Dashboard> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: selectedBranch,
+                  initialValue: selectedBranch,
                   decoration: InputDecoration(
                     labelText: "Branch",
                     filled: true,
@@ -1693,6 +1855,9 @@ class _DashboardState extends State<Dashboard> {
                   : () async {
                       setDialogState(() => isLoading = true);
                       try {
+                        final activeMockathonId = await _dataService
+                            .getActiveMockathonIdStream(branch: selectedBranch)
+                            .first;
                         await _authService.registerStudent(
                           emailController.text,
                           passController.text,
@@ -1700,6 +1865,7 @@ class _DashboardState extends State<Dashboard> {
                           stackController.text,
                           selectedStatus,
                           selectedBranch,
+                          mockathonId: activeMockathonId,
                         );
                         if (context.mounted) Navigator.pop(context);
                         if (context.mounted) {
@@ -1810,7 +1976,7 @@ class _DashboardState extends State<Dashboard> {
               const SizedBox(height: 16),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: selectedRole,
+                initialValue: selectedRole,
                 decoration: InputDecoration(
                   labelText: "Role",
                   filled: true,
@@ -1833,7 +1999,7 @@ class _DashboardState extends State<Dashboard> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: selectedBranch,
+                initialValue: selectedBranch,
                 decoration: InputDecoration(
                   labelText: "Branch",
                   filled: true,
@@ -2276,7 +2442,7 @@ class _DashboardState extends State<Dashboard> {
                       width: isMobile ? 140 : 160,
                       padding: const EdgeInsets.all(12),
                       decoration: AppTheme.bentoDecoration(
-                        color: (p['color'] as Color).withOpacity(0.1),
+                        color: (p['color'] as Color).withValues(alpha: 0.1),
                         radius: 20,
                       ),
                       child: Column(
@@ -2375,7 +2541,7 @@ class _DashboardState extends State<Dashboard> {
                         const SizedBox(height: 16),
 
                         DropdownButtonFormField<String>(
-                          value: targetBranch,
+                          initialValue: targetBranch,
                           decoration: InputDecoration(
                             labelText: "Target Branch",
                             filled: true,
@@ -2512,7 +2678,7 @@ class _DashboardState extends State<Dashboard> {
                       "Branch",
                       _selectedBranchFilter,
                       ['All', ..._branchOptions],
-                      (val) => setState(() => _selectedBranchFilter = val),
+                      (val) => _updateBranchFilter(val),
                     ),
                     const SizedBox(height: 32),
                     StreamBuilder<bool>(
@@ -2532,7 +2698,7 @@ class _DashboardState extends State<Dashboard> {
                                 vertical: 16,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.1),
+                                color: Colors.white.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(24),
                               ),
                               child: Row(
@@ -2572,7 +2738,7 @@ class _DashboardState extends State<Dashboard> {
                                 child: Text(
                                   "⚠️ Please select a specific branch to update results visibility",
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: Colors.white.withValues(alpha: 0.8),
                                     fontSize: 12,
                                     fontStyle: FontStyle.italic,
                                   ),
@@ -2702,7 +2868,7 @@ class _DashboardState extends State<Dashboard> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2762,7 +2928,7 @@ class _DashboardState extends State<Dashboard> {
               const SizedBox(height: 8),
               Text(
                 "Generate and download CSV reports based on student performance.",
-                style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                style: TextStyle(color: Colors.white.withValues(alpha: 0.7)),
               ),
             ],
           ),
@@ -2828,8 +2994,13 @@ class _DashboardState extends State<Dashboard> {
                     "Branch",
                     _reportBranchFilter,
                     ['All', ..._branchOptions],
-                    (val) => setState(() => _reportBranchFilter = val),
+                    (val) {
+                      setState(() => _reportBranchFilter = val);
+                      _listenToActiveMockathon(val);
+                    },
                   ),
+                  const SizedBox(width: 12),
+                  _buildMockathonFilterDropdown(branch: _reportBranchFilter),
                   const SizedBox(width: 12),
                   // Report Sorting
                   Container(
@@ -2840,7 +3011,7 @@ class _DashboardState extends State<Dashboard> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                      border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -2860,8 +3031,9 @@ class _DashboardState extends State<Dashboard> {
                             return DropdownMenuItem(value: e, child: Text(e));
                           }).toList(),
                           onChanged: (val) {
-                            if (val != null)
+                            if (val != null) {
                               setState(() => _reportSortOption = val);
+                            }
                           },
                         ),
                       ],
@@ -3050,6 +3222,489 @@ class _DashboardState extends State<Dashboard> {
       ],
     );
   }
+
+  Widget _buildMockathonsScreen(ThemeData theme) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
+        final double containerPadding = isMobile ? 16 : 24;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(containerPadding),
+                decoration: AppTheme.bentoDecoration(
+                  color: Colors.white,
+                  radius: 24,
+                  shadow: true,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Mockathon Sessions",
+                      style: TextStyle(
+                        fontSize: isMobile ? 20 : 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      "Manage mock interview sessions by date, control active sessions, and migrate legacy data.",
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              if (isMobile) ...[
+                _buildCreateMockathonCard(theme),
+                const SizedBox(height: 24),
+                _buildMigrationCard(theme),
+                const SizedBox(height: 24),
+                _buildMockathonsListCard(theme),
+              ] else ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        children: [
+                          _buildCreateMockathonCard(theme),
+                          const SizedBox(height: 24),
+                          _buildMigrationCard(theme),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      flex: 3,
+                      child: _buildMockathonsListCard(theme),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 40),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCreateMockathonCard(ThemeData theme) {
+    String createBranch = _currentUserProfile?.branch != 'All' && _currentUserProfile != null
+        ? _currentUserProfile!.branch
+        : (_selectedBranchFilter != 'All' ? _selectedBranchFilter : 'Kozhikode');
+
+    return StatefulBuilder(
+      builder: (context, setCardState) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: AppTheme.bentoDecoration(
+            color: Colors.white,
+            radius: 24,
+            shadow: true,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Create New Session",
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _mockathonNameController,
+                decoration: InputDecoration(
+                  labelText: "Session Name (e.g. Mockathon July)",
+                  filled: true,
+                  fillColor: AppTheme.bentoBg,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _selectedMockathonDate ?? DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
+                  );
+                  if (picked != null) {
+                    setCardState(() {
+                      _selectedMockathonDate = picked;
+                    });
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                  decoration: BoxDecoration(
+                    color: AppTheme.bentoBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _selectedMockathonDate == null
+                            ? "Select Session Date"
+                            : "Date: ${_selectedMockathonDate!.year}-${_selectedMockathonDate!.month.toString().padLeft(2, '0')}-${_selectedMockathonDate!.day.toString().padLeft(2, '0')}",
+                        style: TextStyle(
+                          color: _selectedMockathonDate == null ? Colors.grey[700] : Colors.black87,
+                        ),
+                      ),
+                      const Icon(Icons.calendar_month, color: AppTheme.bentoJacket),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (_currentUserProfile?.branch == 'All') ...[
+                DropdownButtonFormField<String>(
+                  initialValue: createBranch,
+                  decoration: InputDecoration(
+                    labelText: "Branch",
+                    filled: true,
+                    fillColor: AppTheme.bentoBg,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: ['All', ..._branchOptions]
+                      .map((b) => DropdownMenuItem(value: b, child: Text(b)))
+                      .toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setCardState(() => createBranch = val);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.bentoAccent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () async {
+                    if (_mockathonNameController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Please enter session name")),
+                      );
+                      return;
+                    }
+                    if (_selectedMockathonDate == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Please select a date")),
+                      );
+                      return;
+                    }
+                    final dateStr = "${_selectedMockathonDate!.year}-${_selectedMockathonDate!.month.toString().padLeft(2, '0')}-${_selectedMockathonDate!.day.toString().padLeft(2, '0')}";
+                    final id = "${dateStr}_${createBranch.toLowerCase()}";
+
+                    final mockathon = MockathonModel(
+                      id: id,
+                      name: _mockathonNameController.text.trim(),
+                      date: _selectedMockathonDate!,
+                      branch: createBranch,
+                      isActive: false,
+                    );
+
+                    final messenger = ScaffoldMessenger.of(context);
+                    try {
+                      await _dataService.createMockathon(mockathon);
+                      _mockathonNameController.clear();
+                      setCardState(() {
+                        _selectedMockathonDate = null;
+                      });
+                      messenger.showSnackBar(
+                        const SnackBar(content: Text("Mockathon session created!")),
+                      );
+                    } catch (e) {
+                      messenger.showSnackBar(
+                        SnackBar(content: Text("Error: $e")),
+                      );
+                    }
+                  },
+                  child: const Text("CREATE SESSION", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMigrationCard(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: AppTheme.bentoDecoration(
+        color: Colors.white,
+        radius: 24,
+        shadow: true,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Legacy Data Migration",
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "If you have older candidate or mark profiles without an associated Mockathon session, use this migration to bundle them into a 'Legacy Data' session.",
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.bentoJacket,
+                side: const BorderSide(color: AppTheme.bentoJacket),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text("Migrate Legacy Data"),
+                    content: Text("This will search all candidates in branch '$_selectedBranchFilter' who are not assigned to any Mockathon, bundle them under a new 'Legacy Data' session, and move their marks accordingly. Proceed?"),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text("Cancel"),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text("Migrate"),
+                      ),
+                    ],
+                  ),
+                );
+                if (!mounted) return;
+
+                if (confirm == true) {
+                  final messenger = ScaffoldMessenger.of(context);
+                  try {
+                    await _dataService.migrateLegacyDataToMockathon(_selectedBranchFilter);
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text("Migration completed successfully!")),
+                    );
+                  } catch (e) {
+                    messenger.showSnackBar(
+                      SnackBar(content: Text("Migration failed: $e")),
+                    );
+                  }
+                }
+              },
+              child: const Text("MIGRATE LEGACY DATA", style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMockathonsListCard(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: AppTheme.bentoDecoration(
+        color: Colors.white,
+        radius: 24,
+        shadow: true,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "Sessions List",
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+              _buildFilterChip(
+                "Branch",
+                _selectedBranchFilter,
+                ['All', ..._branchOptions],
+                (val) => _updateBranchFilter(val),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          StreamBuilder<List<MockathonModel>>(
+            stream: _dataService.getMockathons(branch: _selectedBranchFilter),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final list = snapshot.data ?? [];
+              if (list.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(
+                    child: Text(
+                      "No mockathon sessions found.",
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: list.length,
+                separatorBuilder: (context, index) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final m = list[index];
+                  final formattedDate = "${m.date.year}-${m.date.month.toString().padLeft(2, '0')}-${m.date.day.toString().padLeft(2, '0')}";
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    m.name,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  if (m.isActive)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text(
+                                        "ACTIVE",
+                                        style: TextStyle(
+                                          color: Colors.green,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Date: $formattedDate | Branch: ${m.branch}",
+                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (!m.isActive) ...[
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.green,
+                            ),
+                            onPressed: () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              try {
+                                await _dataService.updateActiveMockathon(m.id, branch: m.branch);
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text("Activated session: ${m.name}")),
+                                );
+                              } catch (e) {
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text("Error: $e")),
+                                );
+                              }
+                            },
+                            child: const Text("Activate"),
+                          ),
+                        ],
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                          onPressed: () async {
+                            final messenger = ScaffoldMessenger.of(context);
+                            final confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text("Delete Session?"),
+                                content: Text("Are you sure you want to delete '${m.name}'? This will unassign all students currently linked to this session and delete their marks records for this session."),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, false),
+                                    child: const Text("Cancel"),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context, true),
+                                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                                    child: const Text("Delete"),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                             if (confirm == true) {
+                              try {
+                                await _dataService.deleteMockathon(m.id);
+                                messenger.showSnackBar(
+                                  const SnackBar(content: Text("Session deleted successfully")),
+                                );
+                              } catch (e) {
+                                messenger.showSnackBar(
+                                  SnackBar(content: Text("Error: $e")),
+                                );
+                              }
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class BulletItem extends StatelessWidget {
@@ -3085,4 +3740,5 @@ class BulletItem extends StatelessWidget {
       ),
     );
   }
+
 }

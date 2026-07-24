@@ -45,8 +45,9 @@ class AuthService {
     String name,
     String stack,
     String remainStatus,
-    String branch,
-  ) async {
+    String branch, {
+    String? mockathonId,
+  }) async {
     // Use a secondary app to prevent the primary app's auth state from changing
     FirebaseApp tempApp = await Firebase.initializeApp(
       name: 'TempRegisterApp_${DateTime.now().millisecondsSinceEpoch}',
@@ -70,6 +71,7 @@ class AuthService {
           remainStatus: remainStatus,
           randomId: randomId,
           hasCompletedOnboarding: false,
+          mockathonId: mockathonId,
         );
 
         await _firestore
@@ -77,6 +79,49 @@ class AuthService {
             .doc(cred.user!.uid)
             .set(student.toMap());
       }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'email-already-in-use') {
+        // Query user in Firestore by email
+        final querySnap = await _firestore
+            .collection('users')
+            .where('email', isEqualTo: email)
+            .limit(1)
+            .get();
+        if (querySnap.docs.isNotEmpty) {
+          final doc = querySnap.docs.first;
+          final existingData = doc.data();
+          final existingMockathonId = existingData['mockathonId'] as String?;
+          final existingHistory = List<String>.from(existingData['mockathonHistory'] ?? []);
+          
+          if (existingMockathonId != null && 
+              existingMockathonId != mockathonId && 
+              !existingHistory.contains(existingMockathonId)) {
+            existingHistory.add(existingMockathonId);
+          }
+
+          final student = StudentModel(
+            uid: doc.id,
+            email: email,
+            name: name,
+            branch: branch,
+            stack: stack,
+            remainStatus: remainStatus,
+            randomId: existingData['randomId'] ?? _generateRandomId(),
+            hasCompletedOnboarding: false,
+            mockathonId: mockathonId,
+            notifications: List<String>.from(existingData['notifications'] ?? []),
+            cvUrl: existingData['cvUrl'],
+            mockathonHistory: existingHistory,
+          );
+
+          await _firestore
+              .collection('users')
+              .doc(doc.id)
+              .set(student.toMap(), SetOptions(merge: true));
+          return;
+        }
+      }
+      rethrow;
     } finally {
       await tempApp.delete();
     }
@@ -122,6 +167,15 @@ class AuthService {
 
   Future<void> signOut() async {
     await _auth.signOut();
+  }
+
+  // Password Reset
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } catch (e) {
+      rethrow;
+    }
   }
 
   String _generateRandomId() {
